@@ -430,6 +430,7 @@ export function AppShell() {
                 type="button"
                 className={`${styles.wbtn} ${auditOpen ? styles.wbtnOn : ""}`}
                 title="操作记录"
+                aria-label="操作记录"
                 aria-pressed={auditOpen}
                 onClick={() => void openAudit()}
               >
@@ -438,31 +439,35 @@ export function AppShell() {
               <button
                 type="button"
                 className={styles.wbtn}
-                title={collapsed ? "展开" : "折叠"}
+                title={collapsed ? "展开主窗" : "最小化"}
+                aria-label={collapsed ? "展开主窗" : "最小化"}
                 onClick={() => void toggleCollapse()}
               >
-                {collapsed ? "▢" : "—"}
+                {collapsed ? "展开" : "最小化"}
               </button>
               <button
                 type="button"
                 className={styles.wbtn}
                 title="隐藏到边缘胶囊"
+                aria-label="隐藏到边缘胶囊"
                 onClick={() => void hideToCapsule()}
               >
-                ◌
+                胶囊
               </button>
               <button
                 type="button"
                 className={styles.wbtn}
-                title="置顶小窗"
+                title="打开置顶小窗"
+                aria-label="打开置顶小窗"
                 onClick={() => void openPin()}
               >
-                ⌃
+                置顶
               </button>
               <button
                 type="button"
                 className={styles.wbtn}
                 title="关闭到托盘"
+                aria-label="关闭到托盘"
                 onClick={() => {
                   void hideMainToTray().then(() => {
                     if (!native) showToast("已隐藏主窗（模拟托盘）");
