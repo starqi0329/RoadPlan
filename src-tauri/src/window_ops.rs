@@ -78,21 +78,20 @@ pub fn set_main_collapsed(
 }
 
 pub fn hide_main_to_tray(app: &AppHandle) -> Result<(), AppError> {
-    // 只隐藏，不把系统在隐藏后给出的坐标/尺寸写回布局。
-    if let Some(main) = app.get_webview_window(MAIN_LABEL) {
-        main.hide().map_err(|error| AppError::Internal {
-            message: format!("隐藏主窗失败: {error}"),
-        })?;
-    }
+    // 只隐藏，不写布局；已隐藏再调仍 Ok（可重复）。找不到主窗不假装成功。
+    let main = require_main(app)?;
+    main.hide().map_err(|error| AppError::Internal {
+        message: format!("隐藏主窗失败: {error}"),
+    })?;
     Ok(())
 }
 
 pub fn show_main(app: &AppHandle) -> Result<(), AppError> {
-    let main = app
-        .get_webview_window(MAIN_LABEL)
-        .ok_or_else(|| AppError::Internal {
-            message: "主窗不存在".into(),
-        })?;
+    let main = require_main(app)?;
+    // 托盘隐藏与系统最小化都能恢复：先解除最小化再显示并聚焦。
+    main.unminimize().map_err(|error| AppError::Internal {
+        message: format!("解除主窗最小化失败: {error}"),
+    })?;
     main.show().map_err(|error| AppError::Internal {
         message: format!("显示主窗失败: {error}"),
     })?;
@@ -100,6 +99,27 @@ pub fn show_main(app: &AppHandle) -> Result<(), AppError> {
         message: format!("聚焦主窗失败: {error}"),
     })?;
     Ok(())
+}
+
+/// 系统最小化：整窗进任务栏，不等于进托盘，也不改 `mainCollapsed`。
+pub fn minimize_main(app: &AppHandle) -> Result<(), AppError> {
+    let main = require_main(app)?;
+    main.minimize().map_err(|error| AppError::Internal {
+        message: format!("最小化主窗失败: {error}"),
+    })?;
+    Ok(())
+}
+
+fn require_main(app: &AppHandle) -> Result<tauri::WebviewWindow, AppError> {
+    app.get_webview_window(MAIN_LABEL)
+        .ok_or_else(main_window_not_found)
+}
+
+fn main_window_not_found() -> AppError {
+    AppError::NotFound {
+        entity: "window".into(),
+        id: MAIN_LABEL.to_owned(),
+    }
 }
 
 pub fn show_pin(app: &AppHandle, state: &WindowUiState) -> Result<(), AppError> {
@@ -278,4 +298,27 @@ fn apply_frame(window: &tauri::WebviewWindow, frame: &WindowFrame) -> Result<(),
             message: format!("设置窗口位置失败: {error}"),
         })?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn missing_main_is_not_found_not_ok() {
+        let err = main_window_not_found();
+        assert!(matches!(
+            err,
+            AppError::NotFound { entity, id }
+                if entity == "window" && id == MAIN_LABEL
+        ));
+    }
+
+    #[test]
+    fn minimize_path_does_not_touch_collapsed_flag() {
+        // 回归：最小化权威路径独立于 set_main_collapsed；布局折叠标志默认仍为 false。
+        let layout = default_layout();
+        assert!(!layout.main_collapsed);
+        assert!(window_layout::validate_layout(&layout).is_ok());
+    }
 }

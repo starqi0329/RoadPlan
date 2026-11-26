@@ -450,6 +450,12 @@ pub fn show_main(app: AppHandle) -> Result<(), AppError> {
 
 #[tauri::command]
 #[specta::specta]
+pub fn minimize_main(app: AppHandle) -> Result<(), AppError> {
+    window_ops::minimize_main(&app)
+}
+
+#[tauri::command]
+#[specta::specta]
 pub fn show_pin(app: AppHandle, state: State<'_, WindowUiState>) -> Result<(), AppError> {
     window_ops::show_pin(&app, &state)
 }
@@ -527,6 +533,7 @@ pub fn builder() -> Builder<tauri::Wry> {
             set_main_collapsed,
             hide_main_to_tray,
             show_main,
+            minimize_main,
             show_pin,
             hide_pin,
             show_capsule,

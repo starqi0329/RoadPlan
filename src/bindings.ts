@@ -288,6 +288,14 @@ async showMain() : Promise<Result<null, AppError>> {
     else return { status: "error", error: e  as any };
 }
 },
+async minimizeMain() : Promise<Result<null, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("minimize_main") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async showPin() : Promise<Result<null, AppError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("show_pin") };
