@@ -13,6 +13,7 @@ use crate::domain::{
 };
 use crate::error::AppError;
 use crate::events::{DataChanged, MinuteTick};
+use crate::goal_ops;
 use crate::plan_ops::{self, Clock};
 
 fn not_done<T>(command: &str) -> Result<T, AppError> {
@@ -25,14 +26,26 @@ fn with_clock<T>(f: impl FnOnce(Clock<'_>) -> Result<T, AppError>) -> Result<T, 
     f(Clock::from_now(now, &stamp))
 }
 
-fn emit_plan_changed(app: &AppHandle) -> Result<(), AppError> {
+fn emit_changed(app: &AppHandle, entities: &[&str]) -> Result<(), AppError> {
     DataChanged {
-        entities: vec!["plan".into(), "audit".into()],
+        entities: entities.iter().map(|item| (*item).to_owned()).collect(),
     }
     .emit(app)
     .map_err(|error| AppError::Internal {
         message: format!("发送 data-changed 失败: {error}"),
     })
+}
+
+fn emit_plan_changed(app: &AppHandle) -> Result<(), AppError> {
+    emit_changed(app, &["plan", "audit"])
+}
+
+fn emit_goal_changed(app: &AppHandle, with_plan: bool) -> Result<(), AppError> {
+    if with_plan {
+        emit_changed(app, &["goal", "plan", "audit"])
+    } else {
+        emit_changed(app, &["goal", "audit"])
+    }
 }
 
 #[tauri::command]
@@ -176,109 +189,166 @@ pub fn delete_plan(app: AppHandle, db: State<'_, Db>, id: String) -> Result<(), 
 #[tauri::command]
 #[specta::specta]
 pub fn list_goals(
+    db: State<'_, Db>,
     level: Option<GoalLevel>,
     period: Option<String>,
 ) -> Result<Vec<GoalView>, AppError> {
-    let _ = (level, period);
-    not_done("list_goals")
+    let conn = db::lock_conn(&db)?;
+    with_clock(|clock| goal_ops::list_goals(&conn, level, period.as_deref(), clock))
 }
 
 #[tauri::command]
 #[specta::specta]
-pub fn list_deleted_goals() -> Result<Vec<GoalView>, AppError> {
-    not_done("list_deleted_goals")
+pub fn list_deleted_goals(db: State<'_, Db>) -> Result<Vec<GoalView>, AppError> {
+    let conn = db::lock_conn(&db)?;
+    with_clock(|clock| goal_ops::list_deleted_goals(&conn, clock))
 }
 
 #[tauri::command]
 #[specta::specta]
-pub fn get_goal(id: String) -> Result<GoalView, AppError> {
-    let _ = id;
-    not_done("get_goal")
+pub fn get_goal(db: State<'_, Db>, id: String) -> Result<GoalView, AppError> {
+    let conn = db::lock_conn(&db)?;
+    with_clock(|clock| goal_ops::get_goal(&conn, &id, clock))
 }
 
 #[tauri::command]
 #[specta::specta]
-pub fn get_goal_chain(target: ChainTarget) -> Result<Vec<GoalView>, AppError> {
-    let _ = target;
-    not_done("get_goal_chain")
+pub fn get_goal_chain(db: State<'_, Db>, target: ChainTarget) -> Result<Vec<GoalView>, AppError> {
+    let conn = db::lock_conn(&db)?;
+    with_clock(|clock| goal_ops::get_goal_chain(&conn, target, clock))
 }
 
 #[tauri::command]
 #[specta::specta]
-pub fn create_goal(input: CreateGoalInput) -> Result<GoalView, AppError> {
-    let _ = input;
-    not_done("create_goal")
+pub fn create_goal(
+    app: AppHandle,
+    db: State<'_, Db>,
+    input: CreateGoalInput,
+) -> Result<GoalView, AppError> {
+    let mut conn = db::lock_conn(&db)?;
+    let result = with_clock(|clock| goal_ops::create_goal(&mut conn, input, clock))?;
+    emit_goal_changed(&app, false)?;
+    Ok(result)
 }
 
 #[tauri::command]
 #[specta::specta]
-pub fn update_goal(id: String, input: UpdateGoalInput) -> Result<GoalView, AppError> {
-    let _ = (id, input);
-    not_done("update_goal")
+pub fn update_goal(
+    app: AppHandle,
+    db: State<'_, Db>,
+    id: String,
+    input: UpdateGoalInput,
+) -> Result<GoalView, AppError> {
+    let mut conn = db::lock_conn(&db)?;
+    let result = with_clock(|clock| goal_ops::update_goal(&mut conn, &id, input, clock))?;
+    emit_goal_changed(&app, false)?;
+    Ok(result)
 }
 
 #[tauri::command]
 #[specta::specta]
-pub fn set_goal_state(id: String, state: GoalState) -> Result<GoalView, AppError> {
-    let _ = (id, state);
-    not_done("set_goal_state")
+pub fn set_goal_state(
+    app: AppHandle,
+    db: State<'_, Db>,
+    id: String,
+    state: GoalState,
+) -> Result<GoalView, AppError> {
+    let mut conn = db::lock_conn(&db)?;
+    let result = with_clock(|clock| goal_ops::set_goal_state(&mut conn, &id, state, clock))?;
+    emit_goal_changed(&app, false)?;
+    Ok(result)
 }
 
 #[tauri::command]
 #[specta::specta]
-pub fn preview_delete_goal(id: String) -> Result<DeleteGoalImpact, AppError> {
-    let _ = id;
-    not_done("preview_delete_goal")
+pub fn preview_delete_goal(db: State<'_, Db>, id: String) -> Result<DeleteGoalImpact, AppError> {
+    let conn = db::lock_conn(&db)?;
+    with_clock(|clock| goal_ops::preview_delete_goal(&conn, &id, clock))
 }
 
 #[tauri::command]
 #[specta::specta]
-pub fn delete_goal(id: String) -> Result<DeleteGoalImpact, AppError> {
-    let _ = id;
-    not_done("delete_goal")
+pub fn delete_goal(
+    app: AppHandle,
+    db: State<'_, Db>,
+    id: String,
+) -> Result<DeleteGoalImpact, AppError> {
+    let mut conn = db::lock_conn(&db)?;
+    let result = with_clock(|clock| goal_ops::delete_goal(&mut conn, &id, clock))?;
+    emit_goal_changed(&app, true)?;
+    Ok(result)
 }
 
 #[tauri::command]
 #[specta::specta]
-pub fn restore_goal(id: String) -> Result<GoalView, AppError> {
-    let _ = id;
-    not_done("restore_goal")
+pub fn restore_goal(app: AppHandle, db: State<'_, Db>, id: String) -> Result<GoalView, AppError> {
+    let mut conn = db::lock_conn(&db)?;
+    let result = with_clock(|clock| goal_ops::restore_goal(&mut conn, &id, clock))?;
+    emit_goal_changed(&app, false)?;
+    Ok(result)
 }
 
 #[tauri::command]
 #[specta::specta]
-pub fn add_milestone(goal_id: String, title: String) -> Result<GoalView, AppError> {
-    let _ = (goal_id, title);
-    not_done("add_milestone")
+pub fn add_milestone(
+    app: AppHandle,
+    db: State<'_, Db>,
+    goal_id: String,
+    title: String,
+) -> Result<GoalView, AppError> {
+    let mut conn = db::lock_conn(&db)?;
+    let result = with_clock(|clock| goal_ops::add_milestone(&mut conn, &goal_id, title, clock))?;
+    emit_goal_changed(&app, false)?;
+    Ok(result)
 }
 
 #[tauri::command]
 #[specta::specta]
 pub fn update_milestone(
+    app: AppHandle,
+    db: State<'_, Db>,
     goal_id: String,
     milestone_id: String,
     title: String,
 ) -> Result<GoalView, AppError> {
-    let _ = (goal_id, milestone_id, title);
-    not_done("update_milestone")
+    let mut conn = db::lock_conn(&db)?;
+    let result = with_clock(|clock| {
+        goal_ops::update_milestone(&mut conn, &goal_id, &milestone_id, title, clock)
+    })?;
+    emit_goal_changed(&app, false)?;
+    Ok(result)
 }
 
 #[tauri::command]
 #[specta::specta]
 pub fn set_milestone_state(
+    app: AppHandle,
+    db: State<'_, Db>,
     goal_id: String,
     milestone_id: String,
     state: MilestoneState,
 ) -> Result<GoalView, AppError> {
-    let _ = (goal_id, milestone_id, state);
-    not_done("set_milestone_state")
+    let mut conn = db::lock_conn(&db)?;
+    let result = with_clock(|clock| {
+        goal_ops::set_milestone_state(&mut conn, &goal_id, &milestone_id, state, clock)
+    })?;
+    emit_goal_changed(&app, false)?;
+    Ok(result)
 }
 
 #[tauri::command]
 #[specta::specta]
-pub fn remove_milestone(goal_id: String, milestone_id: String) -> Result<GoalView, AppError> {
-    let _ = (goal_id, milestone_id);
-    not_done("remove_milestone")
+pub fn remove_milestone(
+    app: AppHandle,
+    db: State<'_, Db>,
+    goal_id: String,
+    milestone_id: String,
+) -> Result<GoalView, AppError> {
+    let mut conn = db::lock_conn(&db)?;
+    let result =
+        with_clock(|clock| goal_ops::remove_milestone(&mut conn, &goal_id, &milestone_id, clock))?;
+    emit_goal_changed(&app, false)?;
+    Ok(result)
 }
 
 #[tauri::command]
