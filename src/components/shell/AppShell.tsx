@@ -168,36 +168,8 @@ export function AppShell() {
     })();
   }, [native, applyNativeShellSize, showToast]);
 
-  useEffect(() => {
-    if (!native) return;
-    let unlisten: (() => void) | undefined;
-    let disposed = false;
-    void (async () => {
-      try {
-        const { getCurrentWindow } = await import("@tauri-apps/api/window");
-        const win = getCurrentWindow();
-        // preventDefault 必须同步；隐藏走可重复的 closeMainToTray
-        unlisten = await win.onCloseRequested((event) => {
-          event.preventDefault();
-          void (async () => {
-            try {
-              await closeMainToTray();
-              showToast("已隐藏到托盘（进程仍在）");
-            } catch (error) {
-              if (isAppError(error)) showToast(translateAppError(error));
-            }
-          })();
-        });
-        if (disposed) unlisten();
-      } catch {
-        // 关闭拦截不可用时忽略
-      }
-    })();
-    return () => {
-      disposed = true;
-      unlisten?.();
-    };
-  }, [native, showToast]);
+  // 系统关闭进托盘：只由 Rust CloseRequested → hide_main_to_tray 处理，
+  // 前端不再挂 onCloseRequested，避免与后端双重 hide。
 
   useEffect(() => {
     if (!native) return;
@@ -271,15 +243,17 @@ export function AppShell() {
   async function minimizeWindow() {
     try {
       await minimizeMain();
+      if (!native) showToast("已最小化（演示：可从任务栏恢复，不是托盘）");
     } catch (error) {
       if (isAppError(error)) showToast(translateAppError(error));
+      else showToast("最小化失败，请再试一次");
     }
   }
 
   async function closeToTray() {
     try {
       await closeMainToTray();
-      if (!native) showToast("已隐藏主窗（模拟托盘）");
+      if (!native) showToast("已进系统托盘（演示：进程不退出）");
       else showToast("已隐藏到托盘（进程仍在）");
     } catch (error) {
       if (isAppError(error)) showToast(translateAppError(error));
@@ -292,7 +266,7 @@ export function AppShell() {
       await showCapsule();
       await closeMainToTray();
       if (!native) {
-        showToast("已隐藏主窗并显示胶囊（浏览器演示）");
+        showToast("已显示胶囊，主窗进托盘（演示）");
       } else {
         showToast("已隐藏到胶囊 / 托盘");
       }
@@ -398,27 +372,33 @@ export function AppShell() {
       ) : null}
 
       {mainMinimized ? (
-        <div className={styles.trayHint}>
-          <p>主窗已最小化（浏览器演示）。真机会整窗消失，可从 Windows 任务栏点图标恢复。</p>
+        <div className={styles.trayHint} data-demo-state="minimized">
+          <p>
+            主窗已<strong>最小化</strong>（浏览器演示）。真机整窗消失，可从
+            <strong> Windows 任务栏</strong>点图标恢复完整主窗。这不是进托盘。
+          </p>
           <button
             type="button"
             onClick={() => {
               void unminimizeMain();
             }}
           >
-            恢复主窗
+            从任务栏恢复（演示）
           </button>
         </div>
       ) : mainHidden ? (
-        <div className={styles.trayHint}>
-          <p>主窗已隐藏（浏览器模拟托盘）。真机关闭主窗会进系统托盘，进程不退出。</p>
+        <div className={styles.trayHint} data-demo-state="tray">
+          <p>
+            主窗已进<strong>系统托盘</strong>
+            （浏览器演示）。真机进程不退出；托盘「打开主窗」可回来。再点 × 应再次进托盘。
+          </p>
           <button
             type="button"
             onClick={() => {
               void import("../../api/window").then(({ showMain }) => showMain());
             }}
           >
-            恢复主窗
+            从托盘打开（演示）
           </button>
         </div>
       ) : (

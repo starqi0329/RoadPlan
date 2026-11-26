@@ -63,60 +63,38 @@ export async function hideMainToTray(): Promise<void> {
 }
 
 /**
- * 关闭进托盘（可重复调用）。
- * 根因对策：先走 hide_main_to_tray；若窗仍可见再直接 hide()，
- * 避免托盘恢复后第二次 × 命令返回成功但窗不消失。
+ * 关闭进托盘：只走后端 `hide_main_to_tray`（可重复）。
+ * 系统关闭拦截留给 Rust CloseRequested，前端不再二次 hide。
  */
 export async function closeMainToTray(): Promise<void> {
-  if (!isTauri()) {
-    await mockWindow.hideMainToTray();
-    return;
-  }
-
-  let commandError: unknown = null;
-  try {
-    unwrapResult(await commands.hideMainToTray());
-  } catch (error) {
-    commandError = error;
-  }
-
-  const { getCurrentWindow } = await import("@tauri-apps/api/window");
-  const win = getCurrentWindow();
-  let visible = true;
-  try {
-    visible = await win.isVisible();
-  } catch {
-    visible = true;
-  }
-
-  if (visible) {
-    try {
-      await win.hide();
-      visible = false;
-    } catch (fallbackError) {
-      if (commandError) throw commandError;
-      throw fallbackError;
-    }
-  }
-
-  if (commandError && visible) throw commandError;
+  await hideMainToTray();
 }
 
-/** 系统最小化：整窗消失，可从任务栏恢复。不用 set_main_collapsed 留顶栏杠。 */
+/**
+ * 系统最小化：整窗消失，任务栏可恢复。不走折叠、不进托盘。
+ *
+ * 后端未合入 `minimize_main` 前：真机暂用窗口 API `minimize()`。
+ * 合入后改为：
+ *   unwrapResult(await commands.minimizeMain());
+ * 浏览器演示仍走 mock。
+ */
 export async function minimizeMain(): Promise<void> {
   if (!isTauri()) {
     await mockWindow.minimizeMain();
     return;
   }
+  // TODO(window-min-close): 后端 minimize_main 合入并生成 bindings 后切换到 commands
   const { getCurrentWindow } = await import("@tauri-apps/api/window");
   await getCurrentWindow().minimize();
 }
 
+/** 浏览器演示：从「最小化」状态恢复。真机由任务栏点回，一般不必调。 */
 export async function unminimizeMain(): Promise<void> {
   if (!isTauri()) {
     await mockWindow.unminimizeMain();
     return;
   }
+  // 真机任务栏恢复由系统完成；若后端提供 restore/show_main 加强，可改调命令
   const { getCurrentWindow } = await import("@tauri-apps/api/window");
   const win = getCurrentWindow();
   await win.unminimize();
