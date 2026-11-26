@@ -51,6 +51,7 @@ pub fn save_window_layout(
     state: &WindowUiState,
     layout: WindowLayout,
 ) -> Result<(), AppError> {
+    // 过小 / 屏外 / 非有限值一律拒绝，避免折叠壳或隐藏后的废几何覆盖展开尺寸。
     window_layout::validate_layout(&layout)?;
     save_layout(app, &layout)?;
     let mut guard = lock_layout(state)?;
@@ -65,6 +66,7 @@ pub fn set_main_collapsed(
 ) -> Result<(), AppError> {
     {
         let mut guard = lock_layout(state)?;
+        // 只改折叠标志，保留上次合法的展开几何。
         guard.main_collapsed = collapsed;
         save_layout(app, &guard)?;
     }
@@ -76,6 +78,7 @@ pub fn set_main_collapsed(
 }
 
 pub fn hide_main_to_tray(app: &AppHandle) -> Result<(), AppError> {
+    // 只隐藏，不把系统在隐藏后给出的坐标/尺寸写回布局。
     if let Some(main) = app.get_webview_window(MAIN_LABEL) {
         main.hide().map_err(|error| AppError::Internal {
             message: format!("隐藏主窗失败: {error}"),
