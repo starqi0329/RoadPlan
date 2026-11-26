@@ -45,6 +45,15 @@ html[data-shell="native"] #root {
   background: #f6f6f8;
 }
 
+/* 折叠矮窗：根节点随顶栏高度，不再留下整页空白垫色 */
+html[data-shell="native"][data-collapsed="true"],
+html[data-shell="native"][data-collapsed="true"] body,
+html[data-shell="native"][data-collapsed="true"] #root {
+  height: auto;
+  min-height: 0;
+  background: transparent;
+}
+
 button,
 input,
 select {
