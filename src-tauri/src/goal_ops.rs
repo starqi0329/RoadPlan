@@ -585,14 +585,20 @@ fn expected_parent(level: GoalLevel) -> HierarchyLevel {
 }
 
 fn map_parent_error(error: RuleError, level: GoalLevel) -> AppError {
-    match error {
-        RuleError::ParentRequired => AppError::ParentRequired {
-            level: hierarchy_of(level),
+    match (error, level) {
+        // 年目标不能有上级：不是「缺上级」，也不是「上级级别不对」
+        (RuleError::InvalidParent, GoalLevel::Year) => AppError::Validation {
+            field: "parentId".into(),
+            message: "年目标不能有上级".into(),
         },
-        RuleError::InvalidParent => AppError::InvalidParent {
+        // parent_required.level = 所缺的上级层级（与计划 R11 的 week 同口径）
+        (RuleError::ParentRequired, _) => AppError::ParentRequired {
+            level: expected_parent(level),
+        },
+        (RuleError::InvalidParent, _) => AppError::InvalidParent {
             expected: expected_parent(level),
         },
-        other => rule_to_app(other),
+        (other, _) => rule_to_app(other),
     }
 }
 

@@ -2,8 +2,8 @@
 
 | 项目 | 内容 |
 | --- | --- |
-| 版本 | 0.2.1 |
-| 状态 | 冻结（切片 1 复核澄清） |
+| 版本 | 0.2.2 |
+| 状态 | 冻结（切片 2 复核澄清） |
 | 源头 | Rust：`src-tauri/src/domain/`；前端类型由它生成到 `src/bindings.ts` |
 | 修改权限 | 只有组织者能改；流程见 `docs/standards/git.md` 与 `docs/templates/contract-change.md` |
 
@@ -274,8 +274,8 @@ type NowInfo = { now: Timestamp; date: LocalDate; minute: Minute; periods: Perio
 
 ### 4.3 目标
 
-- **R13 层级**：year 的 parentId 必须为 null；month 的上级必须是未删除的 year；week 的上级必须是未删除的 month。违反时返回 `parent_required` 或 `invalid_parent`。
-- **R14 周期一致**：period 格式必须与 level 对应；month 的 period 必须属于上级的年份；week 的 period 必须属于上级的月份。
+- **R13 层级**：year 的 parentId 必须为 null；month 的上级必须是未删除的 year；week 的上级必须是未删除的 month。`parent_required.level` 表示所缺的上级层级（月缺年 → `year`，周缺月 → `month`），与计划 R11 同口径。上级存在但级别不对或已删除 → `invalid_parent`，`expected` 为应有的上级层级。年目标若带了上级 → `validation`（字段 `parentId`）。
+- **R14 周期一致**：period 格式必须与 level 对应；month 的 period 必须属于上级的年份；week 的 period 必须属于上级的月份。格式或归属不对 → `validation`（字段 `period`）。
 - **R15 进度**：milestones 型为 `{ done: 完成的里程碑数, total: 里程碑总数 }`；count 型为 `{ done: 该目标及其所有未删除和已删除下级目标下 outcome 为 done 的计划数, total: target }`。
 - **R16 删除预览**：goalsArchived = 该目标与全部未删除下级目标数；plansDeleted = 挂在这些目标下、outcome 为 null 且结束时间点晚于当前时间的计划数；plansKept = 挂在这些目标下的其他计划数。
 - **R17 删除执行**：与预览口径一致；这些目标的 deletedAt 设为同一个时间戳；符合条件的计划被物理删除；其余计划不变。
@@ -327,5 +327,6 @@ type AppError =
 
 | 版本 | 日期 | 内容 |
 | --- | --- | --- |
+| 0.2.2 | 2026-11-26 | 澄清 R13/R14：parent_required 为所缺上级；年带上级与周期错误用 validation |
 | 0.2.1 | 2026-11-26 | 澄清 R12：半开区间相交，首尾相接不算重叠 |
 | 0.2.0 | 2026-11-26 | 首个冻结版本 |
