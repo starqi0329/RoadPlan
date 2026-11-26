@@ -72,33 +72,24 @@ export async function closeMainToTray(): Promise<void> {
 
 /**
  * 系统最小化：整窗消失，任务栏可恢复。不走折叠、不进托盘。
- *
- * 后端未合入 `minimize_main` 前：真机暂用窗口 API `minimize()`。
- * 合入后改为：
- *   unwrapResult(await commands.minimizeMain());
- * 浏览器演示仍走 mock。
+ * 真机走 `minimize_main`；浏览器演示走 mock。
  */
 export async function minimizeMain(): Promise<void> {
-  if (!isTauri()) {
-    await mockWindow.minimizeMain();
-    return;
-  }
-  // TODO(window-min-close): 后端 minimize_main 合入并生成 bindings 后切换到 commands
-  const { getCurrentWindow } = await import("@tauri-apps/api/window");
-  await getCurrentWindow().minimize();
+  await withWindowFallback(
+    async () => {
+      unwrapResult(await commands.minimizeMain());
+    },
+    () => mockWindow.minimizeMain(),
+  );
 }
 
-/** 浏览器演示：从「最小化」状态恢复。真机由任务栏点回，一般不必调。 */
+/** 浏览器演示：从「最小化」状态恢复。真机任务栏点回；必要时也可 `show_main`。 */
 export async function unminimizeMain(): Promise<void> {
   if (!isTauri()) {
     await mockWindow.unminimizeMain();
     return;
   }
-  // 真机任务栏恢复由系统完成；若后端提供 restore/show_main 加强，可改调命令
-  const { getCurrentWindow } = await import("@tauri-apps/api/window");
-  const win = getCurrentWindow();
-  await win.unminimize();
-  await win.setFocus();
+  unwrapResult(await commands.showMain());
 }
 
 export async function showMain(): Promise<void> {

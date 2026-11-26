@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { CONTRACT_VERSION } from "./bindings";
 
 describe("契约", () => {
-  it("版本是 0.3.2", () => {
-    expect(CONTRACT_VERSION).toBe("0.3.2");
+  it("版本是 0.3.3", () => {
+    expect(CONTRACT_VERSION).toBe("0.3.3");
   });
 });
