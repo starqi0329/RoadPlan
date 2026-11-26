@@ -2,8 +2,8 @@
 
 | 项目 | 内容 |
 | --- | --- |
-| 版本 | 0.2.0 |
-| 状态 | 冻结（第 0 阶段） |
+| 版本 | 0.2.1 |
+| 状态 | 冻结（切片 1 复核澄清） |
 | 源头 | Rust：`src-tauri/src/domain/`；前端类型由它生成到 `src/bindings.ts` |
 | 修改权限 | 只有组织者能改；流程见 `docs/standards/git.md` 与 `docs/templates/contract-change.md` |
 
@@ -270,7 +270,7 @@ type NowInfo = { now: Timestamp; date: LocalDate; minute: Minute; periods: Perio
 - **R9 删除计划**：只有未处理的计划可以删除，否则返回 `locked{finished}`。
 - **R10 字段校验**：`0 <= start < end <= 1440`；title 去掉首尾空白后不能为空；note 去掉首尾空白后为空时等同于 null。
 - **R11 所属目标**：kind 为 `core` 时 weekGoalId 必填，否则返回 `parent_required{week}`；weekGoalId 非空时必须指向未删除的周目标，否则返回 `invalid_parent{week}`。
-- **R12 时间重叠**：新建、编辑、改期时，返回同一日期中与之时间区间相交的其他计划（不含已跳过的），不阻止保存。
+- **R12 时间重叠**：新建、编辑、改期时，返回同一日期中与之时间区间相交的其他计划（不含已跳过的），不阻止保存。时间区间按半开区间 `[开始, 结束)` 判断相交；两条计划首尾相接（例如 09:00–10:00 与 10:00–11:00）不算重叠。
 
 ### 4.3 目标
 
@@ -327,4 +327,5 @@ type AppError =
 
 | 版本 | 日期 | 内容 |
 | --- | --- | --- |
+| 0.2.1 | 2026-11-26 | 澄清 R12：半开区间相交，首尾相接不算重叠 |
 | 0.2.0 | 2026-11-26 | 首个冻结版本 |

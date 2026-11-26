@@ -368,4 +368,4 @@ function __makeEvents__<T extends Record<string, any>>(
 	);
 }
 
-export const CONTRACT_VERSION = "0.2.0" as const;
+export const CONTRACT_VERSION = "0.2.1" as const;
