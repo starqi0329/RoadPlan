@@ -2,8 +2,8 @@
 
 | 项目 | 内容 |
 | --- | --- |
-| 版本 | 0.3.1 |
-| 状态 | 冻结（切片 5 复核澄清） |
+| 版本 | 0.3.2 |
+| 状态 | 冻结（窗口布局坏档澄清） |
 | 源头 | Rust：`src-tauri/src/domain/`；前端类型由它生成到 `src/bindings.ts` |
 | 修改权限 | 只有组织者能改；流程见 `docs/standards/git.md` 与 `docs/templates/contract-change.md` |
 
@@ -343,7 +343,7 @@ type WindowLayout = {
 - **R28 关闭进托盘**：用户点主窗关闭（或等价操作）必须走 `hide_main_to_tray`，进程继续跑；只有 `quit_app` 才退出。
 - **R29 置顶**：`pin` 窗口 `alwaysOnTop = true`；可拖动；可最小化或 `hide_pin`。
 - **R30 三窗同数**：`main` / `pin` / `capsule` 读同一后端；任一写成功后，已打开窗口都应收到 `data-changed`。
-- **R31 位置保留**：启动时应用上次 `save_window_layout` 的结果；没有存档则用默认几何。
+- **R31 位置保留**：启动时应用上次 `save_window_layout` 的结果；没有存档则用默认几何。存档不可用（解析失败，或主窗宽小于 640、高小于 480，或坐标绝对值大于 10000，或非有限数）时视为无可用存档，回退默认几何且 `mainCollapsed = false`；不在加载时静默钳制数值。`save_window_layout` 对上述废几何返回 `validation`。折叠只改 `mainCollapsed`，展开几何须仍满足上述下限。
 - **R32 拖动外观**：`set_dragging(true)` 期间允许关闭亚克力/大面积模糊；`false` 后恢复。不要求改业务数据。
 
 ## 5. 事件
@@ -374,6 +374,7 @@ type AppError =
 
 | 版本 | 日期 | 内容 |
 | --- | --- | --- |
+| 0.3.2 | 2026-11-26 | 澄清 R31：主窗最小 640×480；坐标绝对值大于 10000 或非有限为坏档；加载回退默认且展开；保存拒绝废几何 |
 | 0.3.1 | 2026-11-26 | 澄清 list_audit：total 为全库条数；非法 beforeId → not_found |
 | 0.3.0 | 2026-11-26 | 追加窗口命令与 R28–R32（主窗/置顶/胶囊/托盘） |
 | 0.2.3 | 2026-11-26 | 澄清 R25：目标复盘统计含已删除下级，与 R15 一致 |

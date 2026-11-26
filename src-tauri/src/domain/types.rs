@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use specta::Type;
 
 #[cfg_attr(not(test), allow(dead_code))]
-pub const CONTRACT_VERSION: &str = "0.3.1";
+pub const CONTRACT_VERSION: &str = "0.3.2";
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
