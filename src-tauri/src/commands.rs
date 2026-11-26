@@ -9,7 +9,7 @@ use crate::domain::{
     AuditPage, CONTRACT_VERSION, ChainTarget, CopyPlansInput, CreateGoalInput, DeleteGoalImpact,
     GoalLevel, GoalState, GoalView, MilestoneState, NowInfo, Periods, PlanFields, PlanSaveResult,
     PlanView, RescheduleResult, Review, SaveReviewInput, Segment, SetNoteInput, SkipPlanInput,
-    UpdateGoalInput, now_info,
+    UpdateGoalInput, WindowLayout, now_info,
 };
 use crate::error::AppError;
 use crate::events::{DataChanged, MinuteTick};
@@ -409,6 +409,75 @@ pub fn list_audit(limit: u32, before_id: Option<String>) -> Result<AuditPage, Ap
     not_done("list_audit")
 }
 
+#[tauri::command]
+#[specta::specta]
+pub fn get_window_layout() -> Result<WindowLayout, AppError> {
+    not_done("get_window_layout")
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn save_window_layout(layout: WindowLayout) -> Result<(), AppError> {
+    let _ = layout;
+    not_done("save_window_layout")
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn set_main_collapsed(collapsed: bool) -> Result<(), AppError> {
+    let _ = collapsed;
+    not_done("set_main_collapsed")
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn hide_main_to_tray() -> Result<(), AppError> {
+    not_done("hide_main_to_tray")
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn show_main() -> Result<(), AppError> {
+    not_done("show_main")
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn show_pin() -> Result<(), AppError> {
+    not_done("show_pin")
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn hide_pin() -> Result<(), AppError> {
+    not_done("hide_pin")
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn show_capsule() -> Result<(), AppError> {
+    not_done("show_capsule")
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn hide_capsule() -> Result<(), AppError> {
+    not_done("hide_capsule")
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn set_dragging(dragging: bool) -> Result<(), AppError> {
+    let _ = dragging;
+    not_done("set_dragging")
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn quit_app() -> Result<(), AppError> {
+    not_done("quit_app")
+}
+
 pub fn builder() -> Builder<tauri::Wry> {
     Builder::<tauri::Wry>::new()
         .commands(collect_commands![
@@ -443,6 +512,17 @@ pub fn builder() -> Builder<tauri::Wry> {
             save_review,
             update_review,
             list_audit,
+            get_window_layout,
+            save_window_layout,
+            set_main_collapsed,
+            hide_main_to_tray,
+            show_main,
+            show_pin,
+            hide_pin,
+            show_capsule,
+            hide_capsule,
+            set_dragging,
+            quit_app,
         ])
         .events(collect_events![DataChanged, MinuteTick])
 }

@@ -2,8 +2,8 @@
 
 | 项目 | 内容 |
 | --- | --- |
-| 版本 | 0.2.3 |
-| 状态 | 冻结（切片 3 复核澄清） |
+| 版本 | 0.3.0 |
+| 状态 | 冻结（切片 4 窗口与托盘） |
 | 源头 | Rust：`src-tauri/src/domain/`；前端类型由它生成到 `src/bindings.ts` |
 | 修改权限 | 只有组织者能改；流程见 `docs/standards/git.md` 与 `docs/templates/contract-change.md` |
 
@@ -248,7 +248,41 @@ type NowInfo = { now: Timestamp; date: LocalDate; minute: Minute; periods: Perio
 
 ### 3.6 窗口
 
-窗口命令（主窗口、置顶小窗、胶囊、托盘、退出）在切片 4 开始前冻结，届时以契约 0.3 追加。
+三个系统窗口标签：`main`（主窗）、`pin`（置顶小窗）、`capsule`（边缘胶囊）。共享同一份数据；写操作成功后的 `data-changed` 与 `minute-tick` 发给**所有已打开窗口**。
+
+```ts
+type WindowId = "main" | "pin" | "capsule";
+
+type WindowFrame = {
+  x: number;      // 逻辑像素，相对主屏
+  y: number;
+  width: number;
+  height: number;
+};
+
+type WindowLayout = {
+  main: WindowFrame;
+  pin: WindowFrame | null;
+  capsule: WindowFrame | null;
+  mainCollapsed: boolean;
+  pinVisible: boolean;
+  capsuleVisible: boolean;
+};
+```
+
+| 命令 | 参数 | 返回 | 说明 |
+| --- | --- | --- | --- |
+| `get_window_layout` | — | `WindowLayout` | 读持久化布局；缺省时用实现内置默认值 |
+| `save_window_layout` | `layout: WindowLayout` | `void` | 写入本机，供下次启动 |
+| `set_main_collapsed` | `collapsed: boolean` | `void` | 折叠 / 展开主窗内容区 |
+| `hide_main_to_tray` | — | `void` | 隐藏主窗，保留托盘；**不等于退出** |
+| `show_main` | — | `void` | 从托盘或胶囊恢复主窗 |
+| `show_pin` | — | `void` | 打开置顶小窗（始终最前） |
+| `hide_pin` | — | `void` | 关闭置顶小窗 |
+| `show_capsule` | — | `void` | 显示边缘胶囊 |
+| `hide_capsule` | — | `void` | 隐藏边缘胶囊 |
+| `set_dragging` | `dragging: boolean` | `void` | 拖动开始为 true（可关透明/模糊），结束为 false |
+| `quit_app` | — | `void` | 真正退出进程；仅托盘「退出」应调用 |
 
 ## 4. 业务规则
 
@@ -299,6 +333,14 @@ type NowInfo = { now: Timestamp; date: LocalDate; minute: Minute; periods: Perio
 - **R26 留痕**：每个成功的写命令恰好写一条操作记录（`copy_plans` 写一条，摘要中写数量；`delete_goal` 写一条，摘要中写影响数量）。失败的命令不写。读命令不写。
 - **R27 排序**：按 at 倒序，同一时间按 id 倒序。
 
+### 4.7 窗口
+
+- **R28 关闭进托盘**：用户点主窗关闭（或等价操作）必须走 `hide_main_to_tray`，进程继续跑；只有 `quit_app` 才退出。
+- **R29 置顶**：`pin` 窗口 `alwaysOnTop = true`；可拖动；可最小化或 `hide_pin`。
+- **R30 三窗同数**：`main` / `pin` / `capsule` 读同一后端；任一写成功后，已打开窗口都应收到 `data-changed`。
+- **R31 位置保留**：启动时应用上次 `save_window_layout` 的结果；没有存档则用默认几何。
+- **R32 拖动外观**：`set_dragging(true)` 期间允许关闭亚克力/大面积模糊；`false` 后恢复。不要求改业务数据。
+
 ## 5. 事件
 
 Rust 主动发给所有窗口：
@@ -321,12 +363,13 @@ type AppError =
   | { code: "internal"; message: string };
 ```
 
-第 0 阶段除 `get_now` 和 `periods_of` 外，命令都返回 `{ code: "internal", message: "未实现" }`。这两个只读命令已经按第 4 节实现，方便骨架和测试使用固定时间。
+切片 4 起：§3.6 窗口命令须实现。`list_audit` 仍可在切片 5 再实现。其余业务命令按既有切片已实现。
 
 ## 7. 变更记录
 
 | 版本 | 日期 | 内容 |
 | --- | --- | --- |
+| 0.3.0 | 2026-11-26 | 追加窗口命令与 R28–R32（主窗/置顶/胶囊/托盘） |
 | 0.2.3 | 2026-11-26 | 澄清 R25：目标复盘统计含已删除下级，与 R15 一致 |
 | 0.2.2 | 2026-11-26 | 澄清 R13/R14：parent_required 为所缺上级；年带上级与周期错误用 validation |
 | 0.2.1 | 2026-11-26 | 澄清 R12：半开区间相交，首尾相接不算重叠 |

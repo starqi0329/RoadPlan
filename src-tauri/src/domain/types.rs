@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use specta::Type;
 
 #[cfg_attr(not(test), allow(dead_code))]
-pub const CONTRACT_VERSION: &str = "0.2.3";
+pub const CONTRACT_VERSION: &str = "0.3.0";
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
@@ -368,4 +368,24 @@ pub struct AuditPage {
 pub enum ChainTarget {
     Plan { id: String },
     Goal { id: String },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct WindowFrame {
+    pub x: f64,
+    pub y: f64,
+    pub width: f64,
+    pub height: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct WindowLayout {
+    pub main: WindowFrame,
+    pub pin: Option<WindowFrame>,
+    pub capsule: Option<WindowFrame>,
+    pub main_collapsed: bool,
+    pub pin_visible: bool,
+    pub capsule_visible: bool,
 }

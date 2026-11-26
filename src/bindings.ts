@@ -247,6 +247,94 @@ async listAudit(limit: number, beforeId: string | null) : Promise<Result<AuditPa
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
 }
+},
+async getWindowLayout() : Promise<Result<WindowLayout, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("get_window_layout") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async saveWindowLayout(layout: WindowLayout) : Promise<Result<null, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("save_window_layout", { layout }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async setMainCollapsed(collapsed: boolean) : Promise<Result<null, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("set_main_collapsed", { collapsed }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async hideMainToTray() : Promise<Result<null, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("hide_main_to_tray") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async showMain() : Promise<Result<null, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("show_main") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async showPin() : Promise<Result<null, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("show_pin") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async hidePin() : Promise<Result<null, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("hide_pin") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async showCapsule() : Promise<Result<null, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("show_capsule") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async hideCapsule() : Promise<Result<null, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("hide_capsule") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async setDragging(dragging: boolean) : Promise<Result<null, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("set_dragging", { dragging }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async quitApp() : Promise<Result<null, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("quit_app") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
 }
 }
 
@@ -308,6 +396,8 @@ export type Segment = "morning" | "afternoon" | "evening"
 export type SetNoteInput = { id: string; note: string | null }
 export type SkipPlanInput = { id: string; reason: string | null }
 export type UpdateGoalInput = { title: string; acceptance: string; measure: GoalMeasure }
+export type WindowFrame = { x: number; y: number; width: number; height: number }
+export type WindowLayout = { main: WindowFrame; pin: WindowFrame | null; capsule: WindowFrame | null; mainCollapsed: boolean; pinVisible: boolean; capsuleVisible: boolean }
 
 /** tauri-specta globals **/
 
@@ -368,4 +458,4 @@ function __makeEvents__<T extends Record<string, any>>(
 	);
 }
 
-export const CONTRACT_VERSION = "0.2.3" as const;
+export const CONTRACT_VERSION = "0.3.0" as const;
