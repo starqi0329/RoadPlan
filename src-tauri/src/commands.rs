@@ -16,6 +16,7 @@ use crate::events::{DataChanged, MinuteTick};
 use crate::goal_ops;
 use crate::plan_ops::{self, Clock};
 use crate::review_ops;
+use crate::window_ops::{self, WindowUiState};
 
 fn not_done<T>(command: &str) -> Result<T, AppError> {
     Err(AppError::not_done(command))
@@ -411,71 +412,80 @@ pub fn list_audit(limit: u32, before_id: Option<String>) -> Result<AuditPage, Ap
 
 #[tauri::command]
 #[specta::specta]
-pub fn get_window_layout() -> Result<WindowLayout, AppError> {
-    not_done("get_window_layout")
+pub fn get_window_layout(state: State<'_, WindowUiState>) -> Result<WindowLayout, AppError> {
+    window_ops::get_window_layout(&state)
 }
 
 #[tauri::command]
 #[specta::specta]
-pub fn save_window_layout(layout: WindowLayout) -> Result<(), AppError> {
-    let _ = layout;
-    not_done("save_window_layout")
+pub fn save_window_layout(
+    app: AppHandle,
+    state: State<'_, WindowUiState>,
+    layout: WindowLayout,
+) -> Result<(), AppError> {
+    window_ops::save_window_layout(&app, &state, layout)
 }
 
 #[tauri::command]
 #[specta::specta]
-pub fn set_main_collapsed(collapsed: bool) -> Result<(), AppError> {
-    let _ = collapsed;
-    not_done("set_main_collapsed")
+pub fn set_main_collapsed(
+    app: AppHandle,
+    state: State<'_, WindowUiState>,
+    collapsed: bool,
+) -> Result<(), AppError> {
+    window_ops::set_main_collapsed(&app, &state, collapsed)
 }
 
 #[tauri::command]
 #[specta::specta]
-pub fn hide_main_to_tray() -> Result<(), AppError> {
-    not_done("hide_main_to_tray")
+pub fn hide_main_to_tray(app: AppHandle) -> Result<(), AppError> {
+    window_ops::hide_main_to_tray(&app)
 }
 
 #[tauri::command]
 #[specta::specta]
-pub fn show_main() -> Result<(), AppError> {
-    not_done("show_main")
+pub fn show_main(app: AppHandle) -> Result<(), AppError> {
+    window_ops::show_main(&app)
 }
 
 #[tauri::command]
 #[specta::specta]
-pub fn show_pin() -> Result<(), AppError> {
-    not_done("show_pin")
+pub fn show_pin(app: AppHandle, state: State<'_, WindowUiState>) -> Result<(), AppError> {
+    window_ops::show_pin(&app, &state)
 }
 
 #[tauri::command]
 #[specta::specta]
-pub fn hide_pin() -> Result<(), AppError> {
-    not_done("hide_pin")
+pub fn hide_pin(app: AppHandle, state: State<'_, WindowUiState>) -> Result<(), AppError> {
+    window_ops::hide_pin(&app, &state)
 }
 
 #[tauri::command]
 #[specta::specta]
-pub fn show_capsule() -> Result<(), AppError> {
-    not_done("show_capsule")
+pub fn show_capsule(app: AppHandle, state: State<'_, WindowUiState>) -> Result<(), AppError> {
+    window_ops::show_capsule(&app, &state)
 }
 
 #[tauri::command]
 #[specta::specta]
-pub fn hide_capsule() -> Result<(), AppError> {
-    not_done("hide_capsule")
+pub fn hide_capsule(app: AppHandle, state: State<'_, WindowUiState>) -> Result<(), AppError> {
+    window_ops::hide_capsule(&app, &state)
 }
 
 #[tauri::command]
 #[specta::specta]
-pub fn set_dragging(dragging: bool) -> Result<(), AppError> {
-    let _ = dragging;
-    not_done("set_dragging")
+pub fn set_dragging(
+    app: AppHandle,
+    state: State<'_, WindowUiState>,
+    dragging: bool,
+) -> Result<(), AppError> {
+    window_ops::set_dragging(&app, &state, dragging)
 }
 
 #[tauri::command]
 #[specta::specta]
-pub fn quit_app() -> Result<(), AppError> {
-    not_done("quit_app")
+pub fn quit_app(app: AppHandle) -> Result<(), AppError> {
+    window_ops::quit_app(&app)
 }
 
 pub fn builder() -> Builder<tauri::Wry> {
