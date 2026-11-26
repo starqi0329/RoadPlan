@@ -1,4 +1,13 @@
-import type { GoalView, Milestone, NowInfo, PlanView, Review } from "../bindings";
+import type {
+  AuditAction,
+  AuditEntity,
+  AuditEvent,
+  GoalView,
+  Milestone,
+  NowInfo,
+  PlanView,
+  Review,
+} from "../bindings";
 
 export type StoredPlan = Omit<PlanView, "status" | "canComplete" | "editable" | "late">;
 
@@ -7,11 +16,51 @@ export type StoredGoal = Omit<GoalView, "progress" | "childCount">;
 export const planStore = new Map<string, StoredPlan>();
 export const goalStore = new Map<string, StoredGoal>();
 export const reviewStore = new Map<string, Review>();
+export const auditStore: AuditEvent[] = [];
 
 let planSeed = 0;
 let goalSeed = 0;
 let milestoneSeed = 0;
 let reviewSeed = 0;
+let auditSeed = 0;
+
+const auditListeners = new Set<() => void>();
+
+export function subscribeAudit(listener: () => void): () => void {
+  auditListeners.add(listener);
+  return () => auditListeners.delete(listener);
+}
+
+function emitAudit() {
+  for (const listener of auditListeners) listener();
+}
+
+export function nextAuditId(): string {
+  auditSeed += 1;
+  return `mock-audit-${String(auditSeed).padStart(4, "0")}`;
+}
+
+export function pushAudit(input: {
+  action: AuditAction;
+  entity: AuditEntity;
+  entityId: string;
+  entityTitle: string;
+  summary: string;
+}): AuditEvent {
+  const clock = nowInfoFromClock();
+  const event: AuditEvent = {
+    id: nextAuditId(),
+    at: clock.now,
+    action: input.action,
+    entity: input.entity,
+    entityId: input.entityId,
+    entityTitle: input.entityTitle,
+    summary: input.summary,
+  };
+  auditStore.push(event);
+  emitAudit();
+  return event;
+}
 
 export function nextPlanId(): string {
   planSeed += 1;
@@ -80,10 +129,13 @@ export function resetMockStore(): void {
   planStore.clear();
   goalStore.clear();
   reviewStore.clear();
+  auditStore.length = 0;
   planSeed = 0;
   goalSeed = 0;
   milestoneSeed = 0;
   reviewSeed = 0;
+  auditSeed = 0;
+  emitAudit();
 }
 
 export function cloneMilestones(items: Milestone[]): Milestone[] {

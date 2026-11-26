@@ -42,6 +42,86 @@
   );
 }
 
+.mockWin1,
+.mockWin2 {
+  position: absolute;
+  background: rgba(255, 255, 255, 0.5);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 18px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.05);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.mockWin1 {
+  left: 40px;
+  top: 70px;
+  width: min(420px, 36vw);
+  height: 280px;
+}
+
+.mockWin2 {
+  right: 36px;
+  bottom: 60px;
+  width: min(360px, 32vw);
+  height: 220px;
+}
+
+.mockBar {
+  height: 34px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 14px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.mockBar i {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.12);
+}
+
+.mockBar i:nth-child(1) {
+  background: #ff5f57;
+}
+
+.mockBar i:nth-child(2) {
+  background: #febc2e;
+}
+
+.mockBar i:nth-child(3) {
+  background: #28c840;
+}
+
+.mockLines {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.mockLines span {
+  display: block;
+  height: 9px;
+  border-radius: 5px;
+  background: rgba(0, 0, 0, 0.07);
+}
+
+.desktopHint {
+  position: absolute;
+  left: 50%;
+  bottom: 14px;
+  transform: translateX(-50%);
+  margin: 0;
+  font-size: 11px;
+  color: rgba(0, 0, 0, 0.35);
+  letter-spacing: 0.4px;
+  z-index: 0;
+  pointer-events: none;
+}
+
 .app {
   position: relative;
   z-index: 1;
@@ -189,6 +269,12 @@
   background: rgba(0, 0, 0, 0.08);
   color: var(--txt);
   border-color: var(--stroke-2);
+}
+
+.wbtnOn {
+  border-color: rgba(0, 122, 255, 0.35);
+  background: rgba(0, 122, 255, 0.12);
+  color: var(--accent);
 }
 
 .body {

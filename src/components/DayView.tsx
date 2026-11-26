@@ -23,6 +23,7 @@ type Props = {
   /** 嵌在主窗右区时为 true：不要整页壳与顶 Tab。 */
   embedded?: boolean;
   onOpenPin?: () => void;
+  highlightPlanId?: string | null;
 };
 
 function matchesFilter(plan: PlanView, filter: Filter): boolean {
@@ -31,7 +32,7 @@ function matchesFilter(plan: PlanView, filter: Filter): boolean {
   return plan.status === "upcoming" || plan.status === "active" || plan.status === "overdue";
 }
 
-export function DayView({ embedded = false, onOpenPin }: Props) {
+export function DayView({ embedded = false, onOpenPin, highlightPlanId = null }: Props) {
   const [dayTab, setDayTab] = useState<DayTab>("today");
   const [viewDate, setViewDate] = useState<string | null>(null);
   const day = useDayPlans(viewDate);
@@ -211,19 +212,23 @@ export function DayView({ embedded = false, onOpenPin }: Props) {
               ) : null}
 
               {plans.map((plan) => (
-                <PlanItem
+                <div
                   key={plan.id}
-                  plan={plan}
-                  actionsDisabled={blocked}
-                  completing={day.completingId === plan.id}
-                  skipping={day.skippingId === plan.id}
-                  onComplete={(id) => {
-                    void day.completePlan(id);
-                  }}
-                  onSkip={(id) => {
-                    void day.skipPlan(id);
-                  }}
-                />
+                  className={highlightPlanId === plan.id ? styles.highlight : undefined}
+                >
+                  <PlanItem
+                    plan={plan}
+                    actionsDisabled={blocked}
+                    completing={day.completingId === plan.id}
+                    skipping={day.skippingId === plan.id}
+                    onComplete={(id) => {
+                      void day.completePlan(id);
+                    }}
+                    onSkip={(id) => {
+                      void day.skipPlan(id);
+                    }}
+                  />
+                </div>
               ))}
             </section>
           );

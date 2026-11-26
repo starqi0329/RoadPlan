@@ -24,6 +24,7 @@ import { DayView } from "../DayView";
 import { GoalTree } from "../GoalTree";
 import { CapsuleWindow } from "../windows/CapsuleWindow";
 import { PinWindow } from "../windows/PinWindow";
+import { AuditDrawer } from "./AuditDrawer";
 import styles from "./AppShell.module.css";
 import { LeftRail, type RailView } from "./LeftRail";
 import { StatusBar } from "./StatusBar";
@@ -33,6 +34,8 @@ export function AppShell() {
   const [toast, setToast] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState(false);
   const [dragging, setDraggingUi] = useState(false);
+  const [auditOpen, setAuditOpen] = useState(false);
+  const [highlightPlanId, setHighlightPlanId] = useState<string | null>(null);
   const [mockUi, setMockUi] = useState<MockWindowUi>(() => getMockWindowUi());
 
   const { now, plans, activePlan } = useActiveNow();
@@ -188,6 +191,24 @@ export function AppShell() {
     }
   }
 
+  async function openAudit() {
+    if (collapsed) {
+      try {
+        await setMainCollapsed(false);
+        setCollapsed(false);
+      } catch (error) {
+        if (isAppError(error)) showToast(translateAppError(error));
+      }
+    }
+    setAuditOpen((prev) => !prev);
+  }
+
+  function jumpToPlan(planId: string) {
+    setView("day");
+    setHighlightPlanId(planId);
+    window.setTimeout(() => setHighlightPlanId(null), 1800);
+  }
+
   async function beginDrag() {
     setDraggingUi(true);
     try {
@@ -217,9 +238,39 @@ export function AppShell() {
   const dateSub = now ? datePeriodLabel(now.date) : "读取时间中";
 
   return (
-    <div className={`${styles.desktop} ${dragging || mockUi.dragging ? styles.dragging : ""}`}>
+    <div
+      className={`${styles.desktop} ${dragging || mockUi.dragging ? styles.dragging : ""}`}
+      data-frameless="true"
+    >
       <div className={styles.halo1} aria-hidden />
       <div className={styles.halo2} aria-hidden />
+      <div className={styles.mockWin1} aria-hidden>
+        <div className={styles.mockBar}>
+          <i />
+          <i />
+          <i />
+        </div>
+        <div className={styles.mockLines}>
+          <span style={{ width: "60%" }} />
+          <span style={{ width: "90%" }} />
+          <span style={{ width: "75%" }} />
+        </div>
+      </div>
+      <div className={styles.mockWin2} aria-hidden>
+        <div className={styles.mockBar}>
+          <i />
+          <i />
+          <i />
+        </div>
+        <div className={styles.mockLines}>
+          <span style={{ width: "70%" }} />
+          <span style={{ width: "50%" }} />
+          <span style={{ width: "88%" }} />
+        </div>
+      </div>
+      <p className={styles.desktopHint} aria-hidden>
+        无系统标题栏 · 自定义顶栏拖动与关闭
+      </p>
 
       {mainHidden ? (
         <div className={styles.trayHint}>
@@ -274,9 +325,10 @@ export function AppShell() {
             <div className={styles.winbtns}>
               <button
                 type="button"
-                className={styles.wbtn}
-                title="审计记录"
-                onClick={() => showToast("审计：下一切片再做")}
+                className={`${styles.wbtn} ${auditOpen ? styles.wbtnOn : ""}`}
+                title="操作记录"
+                aria-pressed={auditOpen}
+                onClick={() => void openAudit()}
               >
                 审
               </button>
@@ -331,7 +383,11 @@ export function AppShell() {
                 />
                 <section className={styles.main}>
                   {view === "day" ? (
-                    <DayView embedded onOpenPin={() => void openPin()} />
+                    <DayView
+                      embedded
+                      onOpenPin={() => void openPin()}
+                      highlightPlanId={highlightPlanId}
+                    />
                   ) : (
                     <GoalTree embedded level={view as GoalLevel} />
                   )}
@@ -344,6 +400,12 @@ export function AppShell() {
               />
             </>
           ) : null}
+
+          <AuditDrawer
+            open={auditOpen}
+            onClose={() => setAuditOpen(false)}
+            onJumpPlan={jumpToPlan}
+          />
         </div>
       )}
 
