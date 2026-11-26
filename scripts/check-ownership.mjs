@@ -20,7 +20,9 @@ const owners = {
 };
 
 function git(args) {
-  return execSync(`git ${args}`, { encoding: "utf8" }).trim();
+  return execSync(`git -c core.quotepath=false ${args}`, {
+    encoding: "utf8",
+  }).trim();
 }
 
 function changedFiles() {
