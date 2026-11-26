@@ -4,9 +4,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { listGoals } from "../../api/goals";
 import { isAppError } from "../../api/result";
 import {
+  closeMainToTray,
   getMockWindowUi,
   getWindowLayout,
-  hideMainToTray,
   minimizeMain,
   saveWindowLayout,
   setDragging,
@@ -176,14 +176,17 @@ export function AppShell() {
       try {
         const { getCurrentWindow } = await import("@tauri-apps/api/window");
         const win = getCurrentWindow();
-        unlisten = await win.onCloseRequested(async (event) => {
+        // preventDefault 必须同步；隐藏走可重复的 closeMainToTray
+        unlisten = await win.onCloseRequested((event) => {
           event.preventDefault();
-          try {
-            await hideMainToTray();
-            showToast("已隐藏到托盘（进程仍在）");
-          } catch (error) {
-            if (isAppError(error)) showToast(translateAppError(error));
-          }
+          void (async () => {
+            try {
+              await closeMainToTray();
+              showToast("已隐藏到托盘（进程仍在）");
+            } catch (error) {
+              if (isAppError(error)) showToast(translateAppError(error));
+            }
+          })();
         });
         if (disposed) unlisten();
       } catch {
@@ -273,10 +276,21 @@ export function AppShell() {
     }
   }
 
+  async function closeToTray() {
+    try {
+      await closeMainToTray();
+      if (!native) showToast("已隐藏主窗（模拟托盘）");
+      else showToast("已隐藏到托盘（进程仍在）");
+    } catch (error) {
+      if (isAppError(error)) showToast(translateAppError(error));
+      else showToast("隐藏到托盘失败，请再试一次");
+    }
+  }
+
   async function hideToCapsule() {
     try {
       await showCapsule();
-      await hideMainToTray();
+      await closeMainToTray();
       if (!native) {
         showToast("已隐藏主窗并显示胶囊（浏览器演示）");
       } else {
@@ -488,11 +502,7 @@ export function AppShell() {
                 className={styles.wbtn}
                 title="关闭到托盘"
                 aria-label="关闭到托盘"
-                onClick={() => {
-                  void hideMainToTray().then(() => {
-                    if (!native) showToast("已隐藏主窗（模拟托盘）");
-                  });
-                }}
+                onClick={() => void closeToTray()}
               >
                 ×
               </button>
