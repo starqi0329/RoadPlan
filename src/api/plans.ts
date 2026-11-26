@@ -2,10 +2,12 @@ import { isTauri } from "@tauri-apps/api/core";
 import {
   commands,
   events,
+  type CopyPlansInput,
   type NowInfo,
   type PlanFields,
   type PlanSaveResult,
   type PlanView,
+  type RescheduleResult,
   type SkipPlanInput,
 } from "../bindings";
 import { isUnimplemented } from "../errors/appError";
@@ -42,6 +44,22 @@ export async function skipPlan(input: SkipPlanInput): Promise<PlanView> {
   if (!isTauri()) return mock.skipPlan(input);
   return unwrapResult(await commands.skipPlan(input));
 }
+
+export async function copyPlans(input: CopyPlansInput): Promise<PlanView[]> {
+  if (!isTauri()) return mock.copyPlans(input);
+  return unwrapResult(await commands.copyPlans(input));
+}
+
+export async function reschedulePlan(
+  id: string,
+  date: string,
+  fields: PlanFields,
+): Promise<RescheduleResult> {
+  if (!isTauri()) return mock.reschedulePlan(id, date, fields);
+  return unwrapResult(await commands.reschedulePlan(id, date, fields));
+}
+
+export { fieldsFromPlan } from "../lib/planFields";
 
 export function listenDataChanged(onChange: (entities: string[]) => void): () => void {
   if (!isTauri()) {

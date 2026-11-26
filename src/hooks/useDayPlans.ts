@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import {
   completePlan,
+  copyPlans,
   createPlan,
   getNow,
   isUnimplemented,
@@ -9,16 +10,18 @@ import {
   listenMinuteTick,
   listPlans,
   planBackendMode,
+  reschedulePlan,
   skipPlan,
 } from "../api/plans";
 import { isAppError } from "../api/result";
 import type { PlanFields, PlanSaveResult, PlanView } from "../bindings";
 import { translateAppError } from "../errors/appError";
+import { fieldsFromPlan } from "../lib/planFields";
 
 const nowKey = ["now"] as const;
 const plansKey = (date: string) => ["plans", date] as const;
 
-export function useDayPlans() {
+export function useDayPlans(viewDate: string | null) {
   const queryClient = useQueryClient();
   const [banner, setBanner] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -29,14 +32,12 @@ export function useDayPlans() {
     queryFn: getNow,
   });
 
-  const date = nowQuery.data?.date ?? null;
-
   const plansQuery = useQuery({
-    queryKey: date ? plansKey(date) : ["plans", "pending"],
+    queryKey: viewDate ? plansKey(viewDate) : ["plans", "pending"],
     queryFn: async () => {
-      if (!date) return [] as PlanView[];
+      if (!viewDate) return [] as PlanView[];
       try {
-        return await listPlans(date);
+        return await listPlans(viewDate);
       } catch (error) {
         if (isAppError(error) && isUnimplemented(error)) {
           setBackendGap(true);
@@ -45,7 +46,7 @@ export function useDayPlans() {
         throw error;
       }
     },
-    enabled: Boolean(date),
+    enabled: Boolean(viewDate),
   });
 
   useEffect(() => {
@@ -56,20 +57,20 @@ export function useDayPlans() {
 
   useEffect(() => {
     return listenDataChanged((entities) => {
-      if (entities.includes("plan") && date) {
-        void queryClient.invalidateQueries({ queryKey: plansKey(date) });
+      if (entities.includes("plan") && viewDate) {
+        void queryClient.invalidateQueries({ queryKey: plansKey(viewDate) });
       }
     });
-  }, [date, queryClient]);
+  }, [viewDate, queryClient]);
 
   useEffect(() => {
     return listenMinuteTick(() => {
       void queryClient.invalidateQueries({ queryKey: nowKey });
-      if (date) {
-        void queryClient.invalidateQueries({ queryKey: plansKey(date) });
+      if (viewDate) {
+        void queryClient.invalidateQueries({ queryKey: plansKey(viewDate) });
       }
     });
-  }, [date, queryClient]);
+  }, [viewDate, queryClient]);
 
   useEffect(() => {
     if (!toast) return;
@@ -88,18 +89,20 @@ export function useDayPlans() {
     setToast(error instanceof Error ? error.message : "操作失败");
   }
 
-  async function refreshPlans() {
-    if (!date) return;
-    await queryClient.invalidateQueries({ queryKey: plansKey(date) });
+  async function refreshPlans(extraDates: string[] = []) {
+    const dates = new Set(
+      [viewDate, ...extraDates].filter((value): value is string => Boolean(value)),
+    );
+    await Promise.all(
+      [...dates].map((date) => queryClient.invalidateQueries({ queryKey: plansKey(date) })),
+    );
   }
 
   const createMutation = useMutation({
-    mutationFn: (fields: PlanFields) => {
-      if (!date) throw new Error("还不知道今天的日期");
-      return createPlan(date, fields);
-    },
-    onSuccess: async (result: PlanSaveResult) => {
-      await refreshPlans();
+    mutationFn: ({ date, fields }: { date: string; fields: PlanFields }) =>
+      createPlan(date, fields),
+    onSuccess: async (result: PlanSaveResult, variables) => {
+      await refreshPlans([variables.date]);
       if (result.overlaps.length > 0) {
         const names = result.overlaps.map((item) => item.title).join("、");
         setToast(`已保存。与「${names}」时间重叠，仅提示不阻止。`);
@@ -128,26 +131,59 @@ export function useDayPlans() {
     onError: showError,
   });
 
+  const copyMutation = useMutation({
+    mutationFn: ({ planIds, toDate }: { planIds: string[]; toDate: string }) =>
+      copyPlans({ planIds, toDate }),
+    onSuccess: async (_data, variables) => {
+      await refreshPlans([variables.toDate]);
+      setToast(`已复制 ${variables.planIds.length} 条计划到明天`);
+    },
+    onError: showError,
+  });
+
+  const rescheduleMutation = useMutation({
+    mutationFn: async ({ plans, toDate }: { plans: PlanView[]; toDate: string }) => {
+      for (const plan of plans) {
+        await reschedulePlan(plan.id, toDate, fieldsFromPlan(plan));
+      }
+    },
+    onSuccess: async (_data, variables) => {
+      await refreshPlans([variables.toDate, ...variables.plans.map((p) => p.date)]);
+      setToast(`已把 ${variables.plans.length} 条未完成改到明天`);
+    },
+    onError: showError,
+  });
+
   return {
     mode: planBackendMode(),
     backendGap,
     banner,
     toast,
-    clearToast: () => setToast(null),
+    setToast,
     now: nowQuery.data ?? null,
-    date,
+    date: viewDate,
     plans: plansQuery.data ?? [],
     loading: nowQuery.isLoading || plansQuery.isLoading,
     loadError:
       nowQuery.error || (plansQuery.error && !backendGap)
         ? translateCaught(nowQuery.error ?? plansQuery.error)
         : null,
-    createPlan: createMutation.mutateAsync,
+    createPlan: (fields: PlanFields, date = viewDate) => {
+      if (!date) throw new Error("还不知道日期");
+      return createMutation.mutateAsync({ date, fields });
+    },
     creating: createMutation.isPending,
     completePlan: completeMutation.mutateAsync,
     completingId: completeMutation.isPending ? (completeMutation.variables ?? null) : null,
     skipPlan: skipMutation.mutateAsync,
     skippingId: skipMutation.isPending ? (skipMutation.variables ?? null) : null,
+    copyPlansTo: (planIds: string[], toDate: string) =>
+      copyMutation.mutateAsync({ planIds, toDate }),
+    copying: copyMutation.isPending,
+    reschedulePlansTo: (plans: PlanView[], toDate: string) =>
+      rescheduleMutation.mutateAsync({ plans, toDate }),
+    rescheduling: rescheduleMutation.isPending,
+    refreshPlans,
   };
 }
 

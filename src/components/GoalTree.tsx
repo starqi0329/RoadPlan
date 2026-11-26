@@ -5,6 +5,7 @@ import { useGoals } from "../hooks/useGoals";
 import { goalStateLabel, levelLabel, milestoneStateLabel } from "../lib/goalLabels";
 import { CreateGoalForm } from "./CreateGoalForm";
 import { DeleteGoalDialog } from "./DeleteGoalDialog";
+import { GoalReviewPanel } from "./GoalReviewPanel";
 import styles from "./GoalTree.module.css";
 import { useQuery } from "@tanstack/react-query";
 
@@ -23,6 +24,7 @@ export function GoalTree({ onOpenDay }: Props) {
 
   const [listMode, setListMode] = useState<ListMode>("active");
   const [creating, setCreating] = useState(false);
+  const [reviewGoal, setReviewGoal] = useState<GoalView | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<GoalView | null>(null);
   const [deleteImpact, setDeleteImpact] = useState<DeleteGoalImpact | null>(null);
   const [impactLoading, setImpactLoading] = useState(false);
@@ -239,6 +241,13 @@ export function GoalTree({ onOpenDay }: Props) {
                           <button
                             type="button"
                             disabled={blocked}
+                            onClick={() => setReviewGoal(goal)}
+                          >
+                            写复盘
+                          </button>
+                          <button
+                            type="button"
+                            disabled={blocked}
                             onClick={() => {
                               void goalsApi.setGoalState(goal.id, "achieved");
                             }}
@@ -310,6 +319,15 @@ export function GoalTree({ onOpenDay }: Props) {
               setDeleteImpact(null);
             });
           }}
+        />
+      ) : null}
+
+      {reviewGoal ? (
+        <GoalReviewPanel
+          goal={reviewGoal}
+          blocked={blocked}
+          onClose={() => setReviewGoal(null)}
+          onToast={(message) => goalsApi.setToast(message)}
         />
       ) : null}
 

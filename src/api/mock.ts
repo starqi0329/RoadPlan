@@ -1,20 +1,22 @@
 import type {
   AppError,
+  CopyPlansInput,
   NowInfo,
   OverlapRef,
   PlanFields,
   PlanSaveResult,
   PlanStatus,
   PlanView,
+  RescheduleResult,
   SkipPlanInput,
 } from "../bindings";
 import {
+  goalStore,
   nextPlanId,
   nowInfoFromClock,
   planStore,
   resetMockStore,
   type StoredPlan,
-  goalStore,
 } from "./mockStore";
 
 function endTimestamp(date: string, end: number): string {
@@ -193,9 +195,75 @@ export async function skipPlan(input: SkipPlanInput): Promise<PlanView> {
   return deriveView(plan, clock);
 }
 
+export async function copyPlans(input: CopyPlansInput): Promise<PlanView[]> {
+  const clock = nowInfoFromClock();
+  const created: PlanView[] = [];
+  for (const id of input.planIds) {
+    const source = requirePlan(id);
+    const stored: StoredPlan = {
+      id: nextPlanId(),
+      date: input.toDate,
+      start: source.start,
+      end: source.end,
+      title: source.title,
+      acceptance: source.acceptance,
+      kind: source.kind,
+      weekGoalId: source.weekGoalId,
+      note: null,
+      outcome: null,
+      rescheduledFrom: null,
+      createdAt: clock.now,
+      updatedAt: clock.now,
+    };
+    planStore.set(stored.id, stored);
+    created.push(deriveView(stored, clock));
+  }
+  return created;
+}
+
+export async function reschedulePlan(
+  id: string,
+  date: string,
+  fields: PlanFields,
+): Promise<RescheduleResult> {
+  validateFields(fields);
+  const originalStored = requirePlan(id);
+  const clock = nowInfoFromClock();
+  if (originalStored.outcome === null) {
+    originalStored.outcome = {
+      type: "skipped",
+      at: clock.now,
+      reason: `已改期到 ${date}`,
+    };
+    originalStored.updatedAt = clock.now;
+  }
+  const note = fields.note?.trim() ? fields.note.trim() : null;
+  const createdStored: StoredPlan = {
+    id: nextPlanId(),
+    date,
+    start: fields.start,
+    end: fields.end,
+    title: fields.title.trim(),
+    acceptance: fields.acceptance,
+    kind: fields.kind,
+    weekGoalId: fields.weekGoalId,
+    note,
+    outcome: null,
+    rescheduledFrom: id,
+    createdAt: clock.now,
+    updatedAt: clock.now,
+  };
+  planStore.set(createdStored.id, createdStored);
+  return {
+    original: deriveView(originalStored, clock),
+    created: deriveView(createdStored, clock),
+    overlaps: findOverlaps(date, fields.start, fields.end, createdStored.id),
+  };
+}
+
 /** 测试用：清空演示数据。 */
 export function resetMockPlans(): void {
   resetMockStore();
 }
 
-export { nowInfoFromClock, planStore, goalStore };
+export { deriveView, nowInfoFromClock, planStore, goalStore };
