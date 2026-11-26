@@ -198,7 +198,7 @@ pub struct Goal {
     pub updated_at: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct GoalProgress {
     pub done: u32,

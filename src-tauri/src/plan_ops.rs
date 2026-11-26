@@ -575,6 +575,14 @@ fn rule_to_app(error: RuleError) -> AppError {
             field: "start".into(),
             message: "时间须在 0–1440 分钟内".into(),
         },
+        RuleError::PeriodFormat => AppError::Validation {
+            field: "period".into(),
+            message: "周期格式与目标层级不匹配".into(),
+        },
+        RuleError::PeriodMismatch => AppError::Validation {
+            field: "period".into(),
+            message: "周期必须属于上级目标的周期".into(),
+        },
     }
 }
 

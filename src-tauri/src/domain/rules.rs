@@ -2,7 +2,10 @@
 
 use chrono::{DateTime, Datelike, FixedOffset, NaiveDate, Timelike};
 
-use super::{GoalLevel, NowInfo, Periods, PlanKind, PlanOutcome, PlanStatus, Segment};
+use super::{
+    GoalLevel, GoalProgress, Milestone, MilestoneState, NowInfo, Periods, PlanKind, PlanOutcome,
+    PlanStatus, Segment,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RuleError {
@@ -10,6 +13,8 @@ pub enum RuleError {
     InvalidParent,
     TimeOrder,
     TimeOutOfRange,
+    PeriodFormat,
+    PeriodMismatch,
 }
 
 pub fn periods_of(date: NaiveDate) -> Periods {
@@ -153,6 +158,100 @@ pub fn accumulated_count(goal_ids: &[&str], plan_goal_ids: &[Option<&str>]) -> u
         .filter(|id| matches!(id, Some(goal) if goal_ids.contains(goal)))
         .count();
     u32::try_from(count).unwrap_or(u32::MAX)
+}
+
+/// R14：period 格式必须与 level 对应。
+pub fn validate_period_format(level: GoalLevel, period: &str) -> Result<(), RuleError> {
+    match level {
+        GoalLevel::Year => {
+            if period.len() == 4 && period.chars().all(|c| c.is_ascii_digit()) {
+                Ok(())
+            } else {
+                Err(RuleError::PeriodFormat)
+            }
+        }
+        GoalLevel::Month => {
+            if parse_year_month(period).is_some() {
+                Ok(())
+            } else {
+                Err(RuleError::PeriodFormat)
+            }
+        }
+        GoalLevel::Week => {
+            if parse_week_period(period).is_some() {
+                Ok(())
+            } else {
+                Err(RuleError::PeriodFormat)
+            }
+        }
+    }
+}
+
+/// R14：下级 period 必须属于上级 period。
+pub fn validate_period_belongs(
+    level: GoalLevel,
+    period: &str,
+    parent_period: &str,
+) -> Result<(), RuleError> {
+    validate_period_format(level, period)?;
+    let ok = match level {
+        GoalLevel::Year => true,
+        GoalLevel::Month => {
+            period.starts_with(&format!("{parent_period}-"))
+                && period.len() == parent_period.len() + 3
+        }
+        GoalLevel::Week => parse_week_period(period)
+            .is_some_and(|(year, month, _)| parent_period == format!("{year}-{month:02}")),
+    };
+    if ok {
+        Ok(())
+    } else {
+        Err(RuleError::PeriodMismatch)
+    }
+}
+
+pub fn milestone_progress(milestones: &[Milestone]) -> GoalProgress {
+    let total = u32::try_from(milestones.len()).unwrap_or(u32::MAX);
+    let done = milestones
+        .iter()
+        .filter(|item| item.state == MilestoneState::Done)
+        .count();
+    GoalProgress {
+        done: u32::try_from(done).unwrap_or(u32::MAX),
+        total,
+    }
+}
+
+pub fn count_progress(done: u32, target: u32) -> GoalProgress {
+    GoalProgress {
+        done,
+        total: target,
+    }
+}
+
+fn parse_year_month(period: &str) -> Option<(i32, u32)> {
+    let (year_raw, month_raw) = period.split_once('-')?;
+    if year_raw.len() != 4 || month_raw.len() != 2 {
+        return None;
+    }
+    let year: i32 = year_raw.parse().ok()?;
+    let month: u32 = month_raw.parse().ok()?;
+    if (1..=12).contains(&month) {
+        Some((year, month))
+    } else {
+        None
+    }
+}
+
+fn parse_week_period(period: &str) -> Option<(i32, u32, u32)> {
+    let (prefix, week_raw) = period.rsplit_once("-W")?;
+    let (year, month) = parse_year_month(prefix)?;
+    let week: u32 = week_raw.parse().ok()?;
+    if (1..=5).contains(&week) {
+        Some((year, month, week))
+    } else {
+        None
+    }
 }
 
 #[cfg(test)]
@@ -307,5 +406,58 @@ mod tests {
         assert_eq!(validate_interval(23 * 60, 60), Err(RuleError::TimeOrder));
         assert_eq!(validate_interval(9 * 60, 10 * 60), Ok(()));
         assert_eq!(validate_interval(23 * 60, 24 * 60), Ok(()));
+    }
+
+    #[test]
+    fn period_formats_match_levels_and_parents() {
+        assert_eq!(validate_period_format(GoalLevel::Year, "2026"), Ok(()));
+        assert_eq!(validate_period_format(GoalLevel::Month, "2026-11"), Ok(()));
+        assert_eq!(
+            validate_period_format(GoalLevel::Week, "2026-11-W4"),
+            Ok(())
+        );
+        assert_eq!(
+            validate_period_format(GoalLevel::Week, "2026-11-W6"),
+            Err(RuleError::PeriodFormat)
+        );
+        assert_eq!(
+            validate_period_belongs(GoalLevel::Month, "2026-11", "2026"),
+            Ok(())
+        );
+        assert_eq!(
+            validate_period_belongs(GoalLevel::Month, "2025-11", "2026"),
+            Err(RuleError::PeriodMismatch)
+        );
+        assert_eq!(
+            validate_period_belongs(GoalLevel::Week, "2026-11-W4", "2026-11"),
+            Ok(())
+        );
+        assert_eq!(
+            validate_period_belongs(GoalLevel::Week, "2026-12-W1", "2026-11"),
+            Err(RuleError::PeriodMismatch)
+        );
+    }
+
+    #[test]
+    fn milestone_progress_counts_done_items() {
+        let milestones = [
+            Milestone {
+                id: "1".into(),
+                title: "a".into(),
+                state: MilestoneState::Done,
+                order: 0,
+            },
+            Milestone {
+                id: "2".into(),
+                title: "b".into(),
+                state: MilestoneState::Todo,
+                order: 1,
+            },
+        ];
+        assert_eq!(
+            milestone_progress(&milestones),
+            GoalProgress { done: 1, total: 2 }
+        );
+        assert_eq!(count_progress(3, 10), GoalProgress { done: 3, total: 10 });
     }
 }

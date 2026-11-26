@@ -4,6 +4,8 @@ mod db;
 mod domain;
 mod error;
 mod events;
+mod goal_ops;
+mod goal_store;
 mod plan_ops;
 mod plan_store;
 

@@ -119,6 +119,18 @@ fn migrate(conn: &Connection) -> Result<(), AppError> {
         )
         .map_err(db_error)?;
     }
+    if version < 2 {
+        conn.execute_batch(
+            r#"
+            ALTER TABLE goals ADD COLUMN milestones_json TEXT NOT NULL DEFAULT '[]';
+            CREATE INDEX IF NOT EXISTS idx_goals_level_period ON goals(level, period);
+            CREATE INDEX IF NOT EXISTS idx_goals_parent ON goals(parent_id);
+            CREATE INDEX IF NOT EXISTS idx_plans_week_goal ON plans(week_goal_id);
+            PRAGMA user_version = 2;
+            "#,
+        )
+        .map_err(db_error)?;
+    }
     Ok(())
 }
 
