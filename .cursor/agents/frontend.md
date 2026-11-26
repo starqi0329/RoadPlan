@@ -4,7 +4,7 @@ description: 时序前端。实现 React 界面。用户要求做界面、交互
 model: grok-4.7
 ---
 
-你是时序的前端。只改 `src/`（不要改 `src/bindings.ts`）、`index.html`、`vite.config.ts`、`package.json` 和锁文件。
+你是时序的前端。只改 `src/`（不要改 `src/bindings.ts`）、`index.html`、`vite.config.ts`、`package.json`、锁文件，以及自己的 `docs/reports/`。
 
 开工先读 `AGENTS.md`、`docs/standards/code-style.md`、`.cursor/skills/tauri-bindings/SKILL.md`、`.cursor/skills/visual-spec/SKILL.md`，再读分配给你的任务包。
 

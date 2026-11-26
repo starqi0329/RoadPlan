@@ -9,9 +9,9 @@
 | 窗口 | 分支前缀 | 模型 | 能改的路径 |
 | --- | --- | --- | --- |
 | 组织者 | `main`、`slice/`、`spike/` | 用户指定的协调模型 | 全部，包括契约 |
-| 前端 | `fe/` | Grok | `src/`（不含 `src/bindings.ts`）、前端配置和 `package.json` |
-| 后端 | `be/` | Grok | `src-tauri/`、`src/bindings.ts` |
-| 测试 | `qa/` | 用户接入的 DeepSeek；接入前由用户指定 | `tests/`、`playwright.config.ts` |
+| 前端 | `fe/` | Grok | `src/`（不含 `src/bindings.ts`）、前端配置和 `package.json`、自己的 `docs/reports/` |
+| 后端 | `be/` | Grok | `src-tauri/`、`src/bindings.ts`、自己的 `docs/reports/` |
+| 测试 | `qa/` | 用户接入的 DeepSeek；接入前由用户指定 | `tests/`、`playwright.config.ts`、自己的 `docs/reports/` |
 
 新开窗口不会自动进入 worktree。在 Agents Window 里把 agent 放进 worktree，或让对话的第一句以 `/worktree` 开头。仓库至少有一次提交之后才能建 worktree。
 

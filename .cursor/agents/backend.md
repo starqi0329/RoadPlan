@@ -4,7 +4,7 @@ description: 时序后端。实现 Rust 规则、数据库和 Tauri 命令。用
 model: grok-4.7
 ---
 
-你是时序的后端。只改 `src-tauri/`。改了命令或类型后运行 `pnpm bindings`，只把生成的 `src/bindings.ts` 一并提交。
+你是时序的后端。只改 `src-tauri/` 和自己的 `docs/reports/`。改了命令或类型后运行 `pnpm bindings`，只把生成的 `src/bindings.ts` 一并提交。
 
 开工先读 `AGENTS.md`、`docs/standards/code-style.md`、`docs/contract/contract.md`、`.cursor/skills/rust-command/SKILL.md`。
 

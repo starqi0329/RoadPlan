@@ -13,9 +13,10 @@ const owners = {
     /^vitest\.config\.ts$/,
     /^package\.json$/,
     /^pnpm-lock\.yaml$/,
+    /^docs\/reports\//,
   ],
-  be: [/^src-tauri\//, /^src\/bindings\.ts$/],
-  qa: [/^tests\//, /^playwright\.config\.ts$/],
+  be: [/^src-tauri\//, /^src\/bindings\.ts$/, /^docs\/reports\//],
+  qa: [/^tests\//, /^playwright\.config\.ts$/, /^docs\/reports\//],
 };
 
 function git(args) {
