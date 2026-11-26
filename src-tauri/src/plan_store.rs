@@ -2,7 +2,8 @@ use rusqlite::{Connection, OptionalExtension, params};
 
 use crate::db::db_error;
 use crate::domain::{
-    AuditAction, AuditEntity, AuditEvent, GoalLevel, OverlapRef, Plan, PlanKind, PlanOutcome,
+    AuditAction, AuditEntity, AuditEvent, AuditPage, GoalLevel, OverlapRef, Plan, PlanKind,
+    PlanOutcome,
 };
 use crate::error::AppError;
 
@@ -212,6 +213,110 @@ pub fn insert_audit(conn: &Connection, event: &AuditEvent) -> Result<(), AppErro
     Ok(())
 }
 
+/// R27：按 at 倒序，同时间按 id 倒序；`before_id` 取该条之后更早的记录。
+pub fn list_audit(
+    conn: &Connection,
+    limit: u32,
+    before_id: Option<&str>,
+) -> Result<AuditPage, AppError> {
+    let total = conn
+        .query_row("SELECT COUNT(*) FROM audit_events", [], |row| {
+            row.get::<_, i64>(0)
+        })
+        .map_err(db_error)? as u32;
+
+    if limit == 0 {
+        return Ok(AuditPage {
+            items: Vec::new(),
+            total,
+        });
+    }
+
+    let items = match before_id {
+        None => {
+            let mut stmt = conn
+                .prepare(
+                    r#"
+                    SELECT id, at, action, entity, entity_id, entity_title, summary
+                    FROM audit_events
+                    ORDER BY at DESC, id DESC
+                    LIMIT ?1
+                    "#,
+                )
+                .map_err(db_error)?;
+            stmt.query_map([limit], map_audit)
+                .map_err(db_error)?
+                .collect::<Result<Vec<_>, _>>()
+                .map_err(db_error)?
+        }
+        Some(cursor_id) => {
+            let cursor = conn
+                .query_row(
+                    "SELECT at, id FROM audit_events WHERE id = ?1",
+                    [cursor_id],
+                    |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)),
+                )
+                .optional()
+                .map_err(db_error)?
+                .ok_or_else(|| AppError::NotFound {
+                    entity: "audit".into(),
+                    id: cursor_id.to_owned(),
+                })?;
+            let mut stmt = conn
+                .prepare(
+                    r#"
+                    SELECT id, at, action, entity, entity_id, entity_title, summary
+                    FROM audit_events
+                    WHERE at < ?1 OR (at = ?1 AND id < ?2)
+                    ORDER BY at DESC, id DESC
+                    LIMIT ?3
+                    "#,
+                )
+                .map_err(db_error)?;
+            stmt.query_map(params![cursor.0, cursor.1, limit], map_audit)
+                .map_err(db_error)?
+                .collect::<Result<Vec<_>, _>>()
+                .map_err(db_error)?
+        }
+    };
+
+    Ok(AuditPage { items, total })
+}
+
+fn map_audit(row: &rusqlite::Row<'_>) -> Result<AuditEvent, rusqlite::Error> {
+    let action_raw: String = row.get(2)?;
+    let entity_raw: String = row.get(3)?;
+    let action = str_to_action(&action_raw).map_err(|message| {
+        rusqlite::Error::FromSqlConversionFailure(
+            2,
+            rusqlite::types::Type::Text,
+            Box::new(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                message,
+            )),
+        )
+    })?;
+    let entity = str_to_entity(&entity_raw).map_err(|message| {
+        rusqlite::Error::FromSqlConversionFailure(
+            3,
+            rusqlite::types::Type::Text,
+            Box::new(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                message,
+            )),
+        )
+    })?;
+    Ok(AuditEvent {
+        id: row.get(0)?,
+        at: row.get(1)?,
+        action,
+        entity,
+        entity_id: row.get(4)?,
+        entity_title: row.get(5)?,
+        summary: row.get(6)?,
+    })
+}
+
 fn map_plan(row: &rusqlite::Row<'_>) -> Result<Plan, rusqlite::Error> {
     let kind_raw: String = row.get(6)?;
     let outcome_json: Option<String> = row.get(9)?;
@@ -322,5 +427,123 @@ fn entity_to_str(entity: AuditEntity) -> &'static str {
         AuditEntity::Goal => "goal",
         AuditEntity::Milestone => "milestone",
         AuditEntity::Review => "review",
+    }
+}
+
+fn str_to_action(raw: &str) -> Result<AuditAction, String> {
+    match raw {
+        "create" => Ok(AuditAction::Create),
+        "update" => Ok(AuditAction::Update),
+        "complete" => Ok(AuditAction::Complete),
+        "reopen" => Ok(AuditAction::Reopen),
+        "skip" => Ok(AuditAction::Skip),
+        "reschedule" => Ok(AuditAction::Reschedule),
+        "copy" => Ok(AuditAction::Copy),
+        "delete" => Ok(AuditAction::Delete),
+        "restore" => Ok(AuditAction::Restore),
+        "note" => Ok(AuditAction::Note),
+        "review" => Ok(AuditAction::Review),
+        "state" => Ok(AuditAction::State),
+        other => Err(format!("未知操作类型: {other}")),
+    }
+}
+
+fn str_to_entity(raw: &str) -> Result<AuditEntity, String> {
+    match raw {
+        "plan" => Ok(AuditEntity::Plan),
+        "goal" => Ok(AuditEntity::Goal),
+        "milestone" => Ok(AuditEntity::Milestone),
+        "review" => Ok(AuditEntity::Review),
+        other => Err(format!("未知实体类型: {other}")),
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::expect_used)]
+mod tests {
+    use super::*;
+    use crate::db::Db;
+
+    fn seed_event(conn: &Connection, id: &str, at: &str, title: &str, summary: &str) -> AuditEvent {
+        let event = AuditEvent {
+            id: id.to_owned(),
+            at: at.to_owned(),
+            action: AuditAction::Create,
+            entity: AuditEntity::Plan,
+            entity_id: format!("plan-{id}"),
+            entity_title: title.to_owned(),
+            summary: summary.to_owned(),
+        };
+        insert_audit(conn, &event).expect("insert audit");
+        event
+    }
+
+    #[test]
+    fn list_audit_orders_by_at_then_id_desc_and_pages_with_before_id() {
+        let db = Db::open_memory().expect("db");
+        let conn = db.conn.lock().expect("lock");
+
+        seed_event(&conn, "id-a", "2026-11-26T10:00:00+08:00", "早", "创建早");
+        seed_event(
+            &conn,
+            "id-c",
+            "2026-11-26T12:00:00+08:00",
+            "同点后",
+            "创建同点后",
+        );
+        seed_event(
+            &conn,
+            "id-b",
+            "2026-11-26T12:00:00+08:00",
+            "同点前",
+            "创建同点前",
+        );
+        seed_event(
+            &conn,
+            "id-d",
+            "2026-11-26T13:00:00+08:00",
+            "最晚",
+            "创建最晚",
+        );
+
+        let first = list_audit(&conn, 2, None).expect("page1");
+        assert_eq!(first.total, 4);
+        assert_eq!(
+            first
+                .items
+                .iter()
+                .map(|e| e.id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["id-d", "id-c"]
+        );
+
+        let second = list_audit(&conn, 2, Some("id-c")).expect("page2");
+        assert_eq!(second.total, 4);
+        assert_eq!(
+            second
+                .items
+                .iter()
+                .map(|e| e.id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["id-b", "id-a"]
+        );
+
+        let empty = list_audit(&conn, 2, Some("id-a")).expect("tail");
+        assert!(empty.items.is_empty());
+        assert_eq!(empty.total, 4);
+    }
+
+    #[test]
+    fn list_audit_rejects_unknown_before_id() {
+        let db = Db::open_memory().expect("db");
+        let conn = db.conn.lock().expect("lock");
+        let err = list_audit(&conn, 10, Some("missing")).expect_err("not found");
+        assert!(matches!(
+            err,
+            AppError::NotFound {
+                entity,
+                id
+            } if entity == "audit" && id == "missing"
+        ));
     }
 }

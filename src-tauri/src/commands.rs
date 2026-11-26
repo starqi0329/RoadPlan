@@ -18,10 +18,6 @@ use crate::plan_ops::{self, Clock};
 use crate::review_ops;
 use crate::window_ops::{self, WindowUiState};
 
-fn not_done<T>(command: &str) -> Result<T, AppError> {
-    Err(AppError::not_done(command))
-}
-
 fn with_clock<T>(f: impl FnOnce(Clock<'_>) -> Result<T, AppError>) -> Result<T, AppError> {
     let now = clock::current_now();
     let stamp = now.to_rfc3339();
@@ -405,9 +401,13 @@ pub fn update_review(
 
 #[tauri::command]
 #[specta::specta]
-pub fn list_audit(limit: u32, before_id: Option<String>) -> Result<AuditPage, AppError> {
-    let _ = (limit, before_id);
-    not_done("list_audit")
+pub fn list_audit(
+    db: State<'_, Db>,
+    limit: u32,
+    before_id: Option<String>,
+) -> Result<AuditPage, AppError> {
+    let conn = db::lock_conn(&db)?;
+    crate::plan_store::list_audit(&conn, limit, before_id.as_deref())
 }
 
 #[tauri::command]

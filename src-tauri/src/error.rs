@@ -40,14 +40,6 @@ pub enum LockReason {
     Finished,
 }
 
-impl AppError {
-    pub fn not_done(command: &str) -> Self {
-        Self::Internal {
-            message: format!("{command} 未实现"),
-        }
-    }
-}
-
 impl std::fmt::Display for AppError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{self:?}")
