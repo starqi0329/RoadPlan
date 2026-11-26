@@ -175,6 +175,10 @@ pub fn quit_app(app: &AppHandle) -> Result<(), AppError> {
 pub fn apply_startup_layout(app: &AppHandle, state: &WindowUiState) -> Result<(), AppError> {
     let layout = get_window_layout(state)?;
     if let Some(main) = app.get_webview_window(MAIN_LABEL) {
+        main.set_decorations(false)
+            .map_err(|error| AppError::Internal {
+                message: format!("设置主窗无边框失败: {error}"),
+            })?;
         apply_frame(&main, &layout.main)?;
     }
     if layout.pin_visible {
@@ -212,7 +216,7 @@ fn ensure_secondary_window(
         return Ok(());
     }
     let layout = get_window_layout(state)?;
-    let (title, frame, decorations, skip_taskbar) = match label {
+    let (title, frame, skip_taskbar) = match label {
         PIN_LABEL => (
             "时序 · 置顶",
             layout.pin.unwrap_or(WindowFrame {
@@ -221,7 +225,6 @@ fn ensure_secondary_window(
                 width: 320.0,
                 height: 480.0,
             }),
-            true,
             false,
         ),
         CAPSULE_LABEL => (
@@ -232,7 +235,6 @@ fn ensure_secondary_window(
                 width: 56.0,
                 height: 160.0,
             }),
-            false,
             true,
         ),
         other => {
@@ -242,13 +244,14 @@ fn ensure_secondary_window(
         }
     };
 
+    // 主窗 / 置顶 / 胶囊均为无系统边框（S5）；拖动由前端 startDragging。
     let mut builder = WebviewWindowBuilder::new(app, label, WebviewUrl::App("index.html".into()))
         .title(title)
         .inner_size(frame.width, frame.height)
         .position(frame.x, frame.y)
         .always_on_top(true)
         .visible(false)
-        .decorations(decorations);
+        .decorations(false);
 
     if skip_taskbar {
         builder = builder.skip_taskbar(true);
