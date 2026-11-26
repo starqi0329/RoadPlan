@@ -1,7 +1,13 @@
+mod clock;
 mod commands;
+mod db;
 mod domain;
 mod error;
 mod events;
+mod plan_ops;
+mod plan_store;
+
+use tauri::Manager;
 
 pub fn run() {
     let builder = commands::builder();
@@ -10,6 +16,9 @@ pub fn run() {
         .invoke_handler(builder.invoke_handler())
         .setup(move |app| {
             builder.mount_events(app);
+            let path = db::resolve_db_path(app.handle()).map_err(|error| error.to_string())?;
+            let database = db::Db::open(path).map_err(|error| error.to_string())?;
+            app.manage(database);
             Ok(())
         })
         .run(tauri::generate_context!())

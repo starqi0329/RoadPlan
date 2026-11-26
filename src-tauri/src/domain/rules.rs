@@ -1,6 +1,6 @@
 #![cfg_attr(not(test), allow(dead_code))]
 
-use chrono::{DateTime, Datelike, FixedOffset, Local, NaiveDate, Timelike};
+use chrono::{DateTime, Datelike, FixedOffset, NaiveDate, Timelike};
 
 use super::{GoalLevel, NowInfo, Periods, PlanKind, PlanOutcome, PlanStatus, Segment};
 
@@ -20,7 +20,7 @@ pub fn periods_of(date: NaiveDate) -> Periods {
     }
 }
 
-pub fn now_info(now: DateTime<Local>) -> NowInfo {
+pub fn now_info(now: DateTime<FixedOffset>) -> NowInfo {
     let date = now.date_naive();
     let minute =
         u16::try_from(now.hour()).unwrap_or(0) * 60 + u16::try_from(now.minute()).unwrap_or(0);
