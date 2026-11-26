@@ -8,41 +8,14 @@ import type {
   PlanView,
   SkipPlanInput,
 } from "../bindings";
-
-type StoredPlan = Omit<PlanView, "status" | "canComplete" | "editable" | "late">;
-
-const plans = new Map<string, StoredPlan>();
-let seed = 0;
-
-function nextId(): string {
-  seed += 1;
-  return `mock-plan-${String(seed).padStart(4, "0")}`;
-}
-
-function nowInfoFromClock(date = new Date()): NowInfo {
-  const localDate = [
-    date.getFullYear(),
-    String(date.getMonth() + 1).padStart(2, "0"),
-    String(date.getDate()).padStart(2, "0"),
-  ].join("-");
-  const minute = date.getHours() * 60 + date.getMinutes();
-  const offset = -date.getTimezoneOffset();
-  const sign = offset >= 0 ? "+" : "-";
-  const abs = Math.abs(offset);
-  const tz = `${sign}${String(Math.floor(abs / 60)).padStart(2, "0")}:${String(abs % 60).padStart(2, "0")}`;
-  const stamp = `${localDate}T${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}:${String(date.getSeconds()).padStart(2, "0")}${tz}`;
-  const week = Math.floor((date.getDate() - 1) / 7) + 1;
-  return {
-    now: stamp,
-    date: localDate,
-    minute,
-    periods: {
-      year: String(date.getFullYear()),
-      month: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`,
-      week: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-W${week}`,
-    },
-  };
-}
+import {
+  nextPlanId,
+  nowInfoFromClock,
+  planStore,
+  resetMockStore,
+  type StoredPlan,
+  goalStore,
+} from "./mockStore";
 
 function endTimestamp(date: string, end: number): string {
   const hours = Math.floor(end / 60);
@@ -87,7 +60,7 @@ function findOverlaps(
 ): OverlapRef[] {
   const clock = nowInfoFromClock();
   const overlaps: OverlapRef[] = [];
-  for (const plan of plans.values()) {
+  for (const plan of planStore.values()) {
     if (plan.date !== date) continue;
     if (excludeId && plan.id === excludeId) continue;
     const view = deriveView(plan, clock);
@@ -125,10 +98,19 @@ function validateFields(fields: PlanFields): void {
       level: "week",
     } satisfies AppError;
   }
+  if (fields.weekGoalId) {
+    const goal = goalStore.get(fields.weekGoalId);
+    if (!goal || goal.deletedAt || goal.level !== "week") {
+      throw {
+        code: "invalid_parent",
+        expected: "week",
+      } satisfies AppError;
+    }
+  }
 }
 
 function requirePlan(id: string): StoredPlan {
-  const plan = plans.get(id);
+  const plan = planStore.get(id);
   if (!plan) {
     throw {
       code: "not_found",
@@ -145,7 +127,7 @@ export async function getNow(): Promise<NowInfo> {
 
 export async function listPlans(date: string): Promise<PlanView[]> {
   const clock = nowInfoFromClock();
-  return [...plans.values()]
+  return [...planStore.values()]
     .filter((plan) => plan.date === date)
     .map((plan) => deriveView(plan, clock))
     .sort((a, b) => a.start - b.start || a.createdAt.localeCompare(b.createdAt));
@@ -156,7 +138,7 @@ export async function createPlan(date: string, fields: PlanFields): Promise<Plan
   const clock = nowInfoFromClock();
   const note = fields.note?.trim() ? fields.note.trim() : null;
   const stored: StoredPlan = {
-    id: nextId(),
+    id: nextPlanId(),
     date,
     start: fields.start,
     end: fields.end,
@@ -170,7 +152,7 @@ export async function createPlan(date: string, fields: PlanFields): Promise<Plan
     createdAt: clock.now,
     updatedAt: clock.now,
   };
-  plans.set(stored.id, stored);
+  planStore.set(stored.id, stored);
   return {
     plan: deriveView(stored, clock),
     overlaps: findOverlaps(date, fields.start, fields.end, stored.id),
@@ -213,6 +195,7 @@ export async function skipPlan(input: SkipPlanInput): Promise<PlanView> {
 
 /** 测试用：清空演示数据。 */
 export function resetMockPlans(): void {
-  plans.clear();
-  seed = 0;
+  resetMockStore();
 }
+
+export { nowInfoFromClock, planStore, goalStore };

@@ -17,7 +17,7 @@ export function translateAppError(error: AppError): string {
       return `所属目标必须是${levelLabel(error.expected)}目标`;
     case "internal":
       return error.message === "未实现"
-        ? "这一切片的计划读写还没接上后端"
+        ? "这一功能还没接上后端"
         : error.message || "出了点问题，请稍后再试";
   }
 }

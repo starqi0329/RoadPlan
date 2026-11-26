@@ -1,0 +1,74 @@
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 45;
+  display: grid;
+  place-items: center;
+  background: rgba(20, 20, 24, 0.32);
+  padding: 20px;
+}
+
+.panel {
+  width: min(420px, 100%);
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  background: #fff;
+  box-shadow: var(--shadow);
+  padding: 18px;
+}
+
+.panel h2 {
+  margin: 0 0 8px;
+  font-size: 15px;
+}
+
+.panel p {
+  margin: 0 0 10px;
+  font-size: 13px;
+  color: var(--txt-2);
+  line-height: 1.55;
+}
+
+.nums {
+  margin: 12px 0 16px;
+  padding: 12px;
+  border-radius: 10px;
+  background: rgba(255, 159, 10, 0.1);
+  border: 1px solid rgba(255, 159, 10, 0.24);
+  font-size: 13px;
+  color: #8a5a00;
+  line-height: 1.7;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.cancel,
+.danger {
+  font: inherit;
+  font-size: 12px;
+  border-radius: 8px;
+  padding: 8px 14px;
+  cursor: pointer;
+}
+
+.cancel {
+  border: 1px solid var(--stroke-2);
+  background: #fff;
+  color: var(--txt-2);
+}
+
+.danger {
+  border: 0;
+  background: var(--red);
+  color: #fff;
+}
+
+.danger:disabled,
+.cancel:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
