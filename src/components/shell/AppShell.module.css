@@ -54,6 +54,20 @@
   border: 1px solid rgba(255, 255, 255, 0.7);
   background: linear-gradient(160deg, rgba(255, 255, 255, 0.84), rgba(246, 246, 248, 0.88));
   box-shadow: var(--shadow);
+  transition: height 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.collapsed {
+  height: 60px;
+}
+
+.dragging .halo1,
+.dragging .halo2 {
+  opacity: 0.25;
+}
+
+.dragging .app {
+  background: rgba(249, 249, 251, 0.96);
 }
 
 .titlebar {
@@ -66,6 +80,12 @@
   border-bottom: 1px solid var(--stroke);
   background: linear-gradient(90deg, rgba(0, 122, 255, 0.05), transparent 45%);
   flex-shrink: 0;
+  cursor: grab;
+  user-select: none;
+}
+
+.titlebar:active {
+  cursor: grabbing;
 }
 
 .brand {
@@ -199,6 +219,54 @@
   font-size: 12px;
   line-height: 1.5;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+}
+
+.trayHint {
+  position: relative;
+  z-index: 2;
+  max-width: 420px;
+  margin: auto;
+  padding: 22px 20px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid var(--stroke);
+  box-shadow: var(--shadow);
+  text-align: center;
+}
+
+.trayHint p {
+  margin: 0 0 14px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--txt-2);
+}
+
+.trayHint button {
+  border: 0;
+  border-radius: 8px;
+  background: var(--accent);
+  color: #fff;
+  padding: 8px 14px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.demoPin {
+  position: fixed;
+  left: 28px;
+  top: 28px;
+  z-index: 40;
+  width: 320px;
+  height: 88px;
+}
+
+.demoCapsule {
+  position: fixed;
+  right: 12px;
+  top: 30%;
+  z-index: 40;
+  width: 56px;
+  height: 180px;
 }
 
 @media (max-width: 860px) {

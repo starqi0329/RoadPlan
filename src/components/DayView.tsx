@@ -22,6 +22,7 @@ type DayTab = "today" | "tomorrow";
 type Props = {
   /** 嵌在主窗右区时为 true：不要整页壳与顶 Tab。 */
   embedded?: boolean;
+  onOpenPin?: () => void;
 };
 
 function matchesFilter(plan: PlanView, filter: Filter): boolean {
@@ -30,7 +31,7 @@ function matchesFilter(plan: PlanView, filter: Filter): boolean {
   return plan.status === "upcoming" || plan.status === "active" || plan.status === "overdue";
 }
 
-export function DayView({ embedded = false }: Props) {
+export function DayView({ embedded = false, onOpenPin }: Props) {
   const [dayTab, setDayTab] = useState<DayTab>("today");
   const [viewDate, setViewDate] = useState<string | null>(null);
   const day = useDayPlans(viewDate);
@@ -111,6 +112,11 @@ export function DayView({ embedded = false }: Props) {
         >
           + 添加计划
         </button>
+        {onOpenPin ? (
+          <button type="button" className={styles.pin} onClick={onOpenPin}>
+            置顶
+          </button>
+        ) : null}
         <div className={styles.filters} role="group" aria-label="筛选">
           {(
             [
