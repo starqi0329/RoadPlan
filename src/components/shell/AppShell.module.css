@@ -302,8 +302,9 @@
 }
 
 .wbtn {
-  width: 30px;
+  min-width: 30px;
   height: 30px;
+  padding: 0 8px;
   border-radius: 8px;
   border: 1px solid var(--stroke);
   background: rgba(0, 0, 0, 0.03);
@@ -312,6 +313,8 @@
   place-items: center;
   cursor: pointer;
   font-size: 12px;
+  line-height: 1;
+  white-space: nowrap;
 }
 
 .wbtn:hover {
