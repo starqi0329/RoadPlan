@@ -38,9 +38,10 @@ export function AppShell() {
   const [highlightPlanId, setHighlightPlanId] = useState<string | null>(null);
   const [mockUi, setMockUi] = useState<MockWindowUi>(() => getMockWindowUi());
 
+  const native = isTauri();
   const { now, plans, activePlan } = useActiveNow();
   const doneCount = plans.filter((plan) => plan.status === "done").length;
-  const storageHint = isTauri() ? "本地存储" : "浏览器演示（不写库）";
+  const storageHint = native ? "本地存储" : "浏览器演示（不写库）";
 
   const goalsQuery = useQuery({
     queryKey: ["goals"],
@@ -60,14 +61,22 @@ export function AppShell() {
   }, []);
 
   useEffect(() => {
-    if (isTauri()) return;
+    const root = document.documentElement;
+    root.dataset.shell = native ? "native" : "demo";
+    return () => {
+      delete root.dataset.shell;
+    };
+  }, [native]);
+
+  useEffect(() => {
+    if (native) return;
     return subscribeMockWindow(() => {
       const next = getMockWindowUi();
       setMockUi(next);
       setCollapsed(next.collapsed);
       setDraggingUi(next.dragging);
     });
-  }, []);
+  }, [native]);
 
   useEffect(() => {
     void (async () => {
@@ -81,7 +90,7 @@ export function AppShell() {
   }, [showToast]);
 
   useEffect(() => {
-    if (!isTauri()) return;
+    if (!native) return;
     let unlisten: (() => void) | undefined;
     let disposed = false;
     void (async () => {
@@ -106,10 +115,10 @@ export function AppShell() {
       disposed = true;
       unlisten?.();
     };
-  }, [showToast]);
+  }, [native, showToast]);
 
   useEffect(() => {
-    if (!isTauri()) return;
+    if (!native) return;
     let disposed = false;
     const unsubs: Array<() => void> = [];
     let timer: number | undefined;
@@ -156,7 +165,7 @@ export function AppShell() {
       window.clearTimeout(timer);
       unsubs.forEach((fn) => fn());
     };
-  }, [collapsed]);
+  }, [native, collapsed]);
 
   async function toggleCollapse() {
     const next = !collapsed;
@@ -172,7 +181,7 @@ export function AppShell() {
     try {
       await showCapsule();
       await hideMainToTray();
-      if (!isTauri()) {
+      if (!native) {
         showToast("已隐藏主窗并显示胶囊（浏览器演示）");
       } else {
         showToast("已隐藏到胶囊 / 托盘");
@@ -185,7 +194,7 @@ export function AppShell() {
   async function openPin() {
     try {
       await showPin();
-      if (!isTauri()) showToast("已打开置顶小窗（浏览器演示浮层）");
+      if (!native) showToast("已打开置顶小窗（浏览器演示浮层）");
     } catch (error) {
       if (isAppError(error)) showToast(translateAppError(error));
     }
@@ -213,7 +222,7 @@ export function AppShell() {
     setDraggingUi(true);
     try {
       await setDragging(true);
-      if (isTauri()) {
+      if (native) {
         const { getCurrentWindow } = await import("@tauri-apps/api/window");
         await getCurrentWindow().startDragging();
       }
@@ -231,9 +240,9 @@ export function AppShell() {
     }
   }
 
-  const mainHidden = !isTauri() && !mockUi.mainVisible;
-  const showDemoPin = !isTauri() && mockUi.pinVisible;
-  const showDemoCapsule = !isTauri() && mockUi.capsuleVisible;
+  const mainHidden = !native && !mockUi.mainVisible;
+  const showDemoPin = !native && mockUi.pinVisible;
+  const showDemoCapsule = !native && mockUi.capsuleVisible;
   const dateMain = now ? formatDateHeading(now.date) : "—";
   const dateSub = now ? datePeriodLabel(now.date) : "读取时间中";
 
@@ -241,36 +250,39 @@ export function AppShell() {
     <div
       className={`${styles.desktop} ${dragging || mockUi.dragging ? styles.dragging : ""}`}
       data-frameless="true"
+      data-shell={native ? "native" : "demo"}
     >
-      <div className={styles.halo1} aria-hidden />
-      <div className={styles.halo2} aria-hidden />
-      <div className={styles.mockWin1} aria-hidden>
-        <div className={styles.mockBar}>
-          <i />
-          <i />
-          <i />
+      {!native ? (
+        <div className={styles.demoChrome} data-demo-chrome="true" aria-hidden>
+          <div className={styles.halo1} />
+          <div className={styles.halo2} />
+          <div className={styles.mockWin1}>
+            <div className={styles.mockBar}>
+              <i />
+              <i />
+              <i />
+            </div>
+            <div className={styles.mockLines}>
+              <span style={{ width: "60%" }} />
+              <span style={{ width: "90%" }} />
+              <span style={{ width: "75%" }} />
+            </div>
+          </div>
+          <div className={styles.mockWin2}>
+            <div className={styles.mockBar}>
+              <i />
+              <i />
+              <i />
+            </div>
+            <div className={styles.mockLines}>
+              <span style={{ width: "70%" }} />
+              <span style={{ width: "50%" }} />
+              <span style={{ width: "88%" }} />
+            </div>
+          </div>
+          <p className={styles.desktopHint}>无系统标题栏 · 自定义顶栏拖动与关闭</p>
         </div>
-        <div className={styles.mockLines}>
-          <span style={{ width: "60%" }} />
-          <span style={{ width: "90%" }} />
-          <span style={{ width: "75%" }} />
-        </div>
-      </div>
-      <div className={styles.mockWin2} aria-hidden>
-        <div className={styles.mockBar}>
-          <i />
-          <i />
-          <i />
-        </div>
-        <div className={styles.mockLines}>
-          <span style={{ width: "70%" }} />
-          <span style={{ width: "50%" }} />
-          <span style={{ width: "88%" }} />
-        </div>
-      </div>
-      <p className={styles.desktopHint} aria-hidden>
-        无系统标题栏 · 自定义顶栏拖动与关闭
-      </p>
+      ) : null}
 
       {mainHidden ? (
         <div className={styles.trayHint}>
@@ -362,7 +374,7 @@ export function AppShell() {
                 title="关闭到托盘"
                 onClick={() => {
                   void hideMainToTray().then(() => {
-                    if (!isTauri()) showToast("已隐藏主窗（模拟托盘）");
+                    if (!native) showToast("已隐藏主窗（模拟托盘）");
                   });
                 }}
               >
