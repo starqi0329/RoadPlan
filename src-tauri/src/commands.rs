@@ -1,7 +1,10 @@
 use chrono::NaiveDate;
 use specta_typescript::Typescript;
-use tauri_specta::{Builder, collect_commands, collect_events};
+use tauri::{AppHandle, State};
+use tauri_specta::{Builder, Event, collect_commands, collect_events};
 
+use crate::clock;
+use crate::db::{self, Db};
 use crate::domain::{
     AuditPage, CONTRACT_VERSION, ChainTarget, CopyPlansInput, CreateGoalInput, DeleteGoalImpact,
     GoalLevel, GoalState, GoalView, MilestoneState, NowInfo, Periods, PlanFields, PlanSaveResult,
@@ -10,15 +13,32 @@ use crate::domain::{
 };
 use crate::error::AppError;
 use crate::events::{DataChanged, MinuteTick};
+use crate::plan_ops::{self, Clock};
 
 fn not_done<T>(command: &str) -> Result<T, AppError> {
     Err(AppError::not_done(command))
 }
 
+fn with_clock<T>(f: impl FnOnce(Clock<'_>) -> Result<T, AppError>) -> Result<T, AppError> {
+    let now = clock::current_now();
+    let stamp = now.to_rfc3339();
+    f(Clock::from_now(now, &stamp))
+}
+
+fn emit_plan_changed(app: &AppHandle) -> Result<(), AppError> {
+    DataChanged {
+        entities: vec!["plan".into(), "audit".into()],
+    }
+    .emit(app)
+    .map_err(|error| AppError::Internal {
+        message: format!("发送 data-changed 失败: {error}"),
+    })
+}
+
 #[tauri::command]
 #[specta::specta]
 pub fn get_now() -> NowInfo {
-    now_info(chrono::Local::now())
+    now_info(clock::current_now())
 }
 
 #[tauri::command]
@@ -34,76 +54,123 @@ pub fn periods_of(date: String) -> Result<Periods, AppError> {
 
 #[tauri::command]
 #[specta::specta]
-pub fn list_plans(date: String) -> Result<Vec<PlanView>, AppError> {
-    let _ = date;
-    not_done("list_plans")
+pub fn list_plans(db: State<'_, Db>, date: String) -> Result<Vec<PlanView>, AppError> {
+    let conn = db::lock_conn(&db)?;
+    with_clock(|clock| plan_ops::list_plans(&conn, &date, clock))
 }
 
 #[tauri::command]
 #[specta::specta]
-pub fn create_plan(date: String, fields: PlanFields) -> Result<PlanSaveResult, AppError> {
-    let _ = (date, fields);
-    not_done("create_plan")
+pub fn create_plan(
+    app: AppHandle,
+    db: State<'_, Db>,
+    date: String,
+    fields: PlanFields,
+) -> Result<PlanSaveResult, AppError> {
+    let mut conn = db::lock_conn(&db)?;
+    let result = with_clock(|clock| plan_ops::create_plan(&mut conn, &date, fields, clock))?;
+    emit_plan_changed(&app)?;
+    Ok(result)
 }
 
 #[tauri::command]
 #[specta::specta]
-pub fn update_plan(id: String, fields: PlanFields) -> Result<PlanSaveResult, AppError> {
-    let _ = (id, fields);
-    not_done("update_plan")
+pub fn update_plan(
+    app: AppHandle,
+    db: State<'_, Db>,
+    id: String,
+    fields: PlanFields,
+) -> Result<PlanSaveResult, AppError> {
+    let mut conn = db::lock_conn(&db)?;
+    let result = with_clock(|clock| plan_ops::update_plan(&mut conn, &id, fields, clock))?;
+    emit_plan_changed(&app)?;
+    Ok(result)
 }
 
 #[tauri::command]
 #[specta::specta]
 pub fn reschedule_plan(
+    app: AppHandle,
+    db: State<'_, Db>,
     id: String,
     date: String,
     fields: PlanFields,
 ) -> Result<RescheduleResult, AppError> {
-    let _ = (id, date, fields);
-    not_done("reschedule_plan")
+    let mut conn = db::lock_conn(&db)?;
+    let result =
+        with_clock(|clock| plan_ops::reschedule_plan(&mut conn, &id, &date, fields, clock))?;
+    emit_plan_changed(&app)?;
+    Ok(result)
 }
 
 #[tauri::command]
 #[specta::specta]
-pub fn copy_plans(input: CopyPlansInput) -> Result<Vec<PlanView>, AppError> {
-    let _ = input;
-    not_done("copy_plans")
+pub fn copy_plans(
+    app: AppHandle,
+    db: State<'_, Db>,
+    input: CopyPlansInput,
+) -> Result<Vec<PlanView>, AppError> {
+    let mut conn = db::lock_conn(&db)?;
+    let result = with_clock(|clock| {
+        plan_ops::copy_plans(&mut conn, &input.plan_ids, &input.to_date, clock)
+    })?;
+    emit_plan_changed(&app)?;
+    Ok(result)
 }
 
 #[tauri::command]
 #[specta::specta]
-pub fn complete_plan(id: String) -> Result<PlanView, AppError> {
-    let _ = id;
-    not_done("complete_plan")
+pub fn complete_plan(app: AppHandle, db: State<'_, Db>, id: String) -> Result<PlanView, AppError> {
+    let mut conn = db::lock_conn(&db)?;
+    let result = with_clock(|clock| plan_ops::complete_plan(&mut conn, &id, clock))?;
+    emit_plan_changed(&app)?;
+    Ok(result)
 }
 
 #[tauri::command]
 #[specta::specta]
-pub fn reopen_plan(id: String) -> Result<PlanView, AppError> {
-    let _ = id;
-    not_done("reopen_plan")
+pub fn reopen_plan(app: AppHandle, db: State<'_, Db>, id: String) -> Result<PlanView, AppError> {
+    let mut conn = db::lock_conn(&db)?;
+    let result = with_clock(|clock| plan_ops::reopen_plan(&mut conn, &id, clock))?;
+    emit_plan_changed(&app)?;
+    Ok(result)
 }
 
 #[tauri::command]
 #[specta::specta]
-pub fn skip_plan(input: SkipPlanInput) -> Result<PlanView, AppError> {
-    let _ = input;
-    not_done("skip_plan")
+pub fn skip_plan(
+    app: AppHandle,
+    db: State<'_, Db>,
+    input: SkipPlanInput,
+) -> Result<PlanView, AppError> {
+    let mut conn = db::lock_conn(&db)?;
+    let result =
+        with_clock(|clock| plan_ops::skip_plan(&mut conn, &input.id, input.reason, clock))?;
+    emit_plan_changed(&app)?;
+    Ok(result)
 }
 
 #[tauri::command]
 #[specta::specta]
-pub fn set_plan_note(input: SetNoteInput) -> Result<PlanView, AppError> {
-    let _ = input;
-    not_done("set_plan_note")
+pub fn set_plan_note(
+    app: AppHandle,
+    db: State<'_, Db>,
+    input: SetNoteInput,
+) -> Result<PlanView, AppError> {
+    let mut conn = db::lock_conn(&db)?;
+    let result =
+        with_clock(|clock| plan_ops::set_plan_note(&mut conn, &input.id, input.note, clock))?;
+    emit_plan_changed(&app)?;
+    Ok(result)
 }
 
 #[tauri::command]
 #[specta::specta]
-pub fn delete_plan(id: String) -> Result<(), AppError> {
-    let _ = id;
-    not_done("delete_plan")
+pub fn delete_plan(app: AppHandle, db: State<'_, Db>, id: String) -> Result<(), AppError> {
+    let mut conn = db::lock_conn(&db)?;
+    with_clock(|clock| plan_ops::delete_plan(&mut conn, &id, clock))?;
+    emit_plan_changed(&app)?;
+    Ok(())
 }
 
 #[tauri::command]
