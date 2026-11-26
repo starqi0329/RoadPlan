@@ -131,6 +131,34 @@ fn migrate(conn: &Connection) -> Result<(), AppError> {
         )
         .map_err(db_error)?;
     }
+    if version < 3 {
+        conn.execute_batch(
+            r#"
+            CREATE TABLE reviews (
+                id TEXT PRIMARY KEY NOT NULL,
+                target_type TEXT NOT NULL,
+                date TEXT,
+                segment TEXT,
+                goal_id TEXT,
+                note TEXT NOT NULL,
+                stats_json TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+
+            CREATE UNIQUE INDEX idx_reviews_segment_unique
+                ON reviews(date, segment)
+                WHERE target_type = 'segment';
+
+            CREATE INDEX idx_reviews_goal_created
+                ON reviews(goal_id, created_at DESC, id DESC)
+                WHERE target_type = 'goal';
+
+            PRAGMA user_version = 3;
+            "#,
+        )
+        .map_err(db_error)?;
+    }
     Ok(())
 }
 
