@@ -15,6 +15,7 @@ import {
   nextPlanId,
   nowInfoFromClock,
   planStore,
+  pushAudit,
   resetMockStore,
   type StoredPlan,
 } from "./mockStore";
@@ -155,6 +156,13 @@ export async function createPlan(date: string, fields: PlanFields): Promise<Plan
     updatedAt: clock.now,
   };
   planStore.set(stored.id, stored);
+  pushAudit({
+    action: "create",
+    entity: "plan",
+    entityId: stored.id,
+    entityTitle: stored.title,
+    summary: `新建计划「${stored.title}」`,
+  });
   return {
     plan: deriveView(stored, clock),
     overlaps: findOverlaps(date, fields.start, fields.end, stored.id),
@@ -179,6 +187,13 @@ export async function completePlan(id: string): Promise<PlanView> {
   }
   plan.outcome = { type: "done", at: clock.now };
   plan.updatedAt = clock.now;
+  pushAudit({
+    action: "complete",
+    entity: "plan",
+    entityId: plan.id,
+    entityTitle: plan.title,
+    summary: `完成计划「${plan.title}」`,
+  });
   return deriveView(plan, clock);
 }
 
@@ -192,6 +207,13 @@ export async function skipPlan(input: SkipPlanInput): Promise<PlanView> {
   const reason = input.reason?.trim() ? input.reason.trim() : null;
   plan.outcome = { type: "skipped", at: clock.now, reason };
   plan.updatedAt = clock.now;
+  pushAudit({
+    action: "skip",
+    entity: "plan",
+    entityId: plan.id,
+    entityTitle: plan.title,
+    summary: `跳过计划「${plan.title}」`,
+  });
   return deriveView(plan, clock);
 }
 
@@ -217,6 +239,15 @@ export async function copyPlans(input: CopyPlansInput): Promise<PlanView[]> {
     };
     planStore.set(stored.id, stored);
     created.push(deriveView(stored, clock));
+  }
+  if (created.length > 0) {
+    pushAudit({
+      action: "copy",
+      entity: "plan",
+      entityId: created[0]!.id,
+      entityTitle: created[0]!.title,
+      summary: `复制 ${created.length} 条计划到 ${input.toDate}`,
+    });
   }
   return created;
 }

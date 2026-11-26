@@ -1,7 +1,14 @@
 import type { AppError, NowInfo, Review, ReviewStats, ReviewTarget, Segment } from "../bindings";
 import { segmentHasStarted, segmentMeta } from "../lib/segments";
 import { deriveView } from "./mock";
-import { goalStore, nextReviewId, nowInfoFromClock, planStore, reviewStore } from "./mockStore";
+import {
+  goalStore,
+  nextReviewId,
+  nowInfoFromClock,
+  planStore,
+  pushAudit,
+  reviewStore,
+} from "./mockStore";
 
 function segmentKey(date: string, segment: Segment): string {
   return `segment:${date}:${segment}`;
@@ -112,6 +119,13 @@ export async function saveReview(target: ReviewTarget, note: string): Promise<Re
       updatedAt: clock.now,
     };
     reviewStore.set(key, created);
+    pushAudit({
+      action: "review",
+      entity: "review",
+      entityId: created.id,
+      entityTitle: `${target.segment} 复盘`,
+      summary: `保存时段复盘（${target.date} ${target.segment}）`,
+    });
     return created;
   }
 
@@ -132,6 +146,13 @@ export async function saveReview(target: ReviewTarget, note: string): Promise<Re
     updatedAt: clock.now,
   };
   reviewStore.set(created.id, created);
+  pushAudit({
+    action: "review",
+    entity: "review",
+    entityId: created.id,
+    entityTitle: goal.title,
+    summary: `保存目标复盘「${goal.title}」`,
+  });
   return created;
 }
 

@@ -15,6 +15,7 @@ import {
   nextMilestoneId,
   nowInfoFromClock,
   planStore,
+  pushAudit,
   type StoredGoal,
 } from "./mockStore";
 
@@ -180,6 +181,13 @@ export async function createGoal(input: CreateGoalInput): Promise<GoalView> {
     updatedAt: clock.now,
   };
   goalStore.set(stored.id, stored);
+  pushAudit({
+    action: "create",
+    entity: "goal",
+    entityId: stored.id,
+    entityTitle: stored.title,
+    summary: `新建${stored.level === "year" ? "年" : stored.level === "month" ? "月" : "周"}目标「${stored.title}」`,
+  });
   return toView(stored);
 }
 
