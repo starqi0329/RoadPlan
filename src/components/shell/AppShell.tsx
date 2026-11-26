@@ -7,12 +7,14 @@ import {
   getMockWindowUi,
   getWindowLayout,
   hideMainToTray,
+  minimizeMain,
   saveWindowLayout,
   setDragging,
   setMainCollapsed,
   showCapsule,
   showPin,
   subscribeMockWindow,
+  unminimizeMain,
   type MockWindowUi,
 } from "../../api/window";
 import type { GoalLevel, WindowFrame } from "../../bindings";
@@ -147,10 +149,18 @@ export function AppShell() {
         if (isSaneExpandedFrame(layout.main)) {
           expandedMainRef.current = layout.main;
         }
-        setCollapsed(layout.mainCollapsed);
-        collapsedRef.current = layout.mainCollapsed;
-        if (native) {
-          await applyNativeShellSize(layout.mainCollapsed);
+        // 顶栏「—」改为系统最小化后，不再用 mainCollapsed 留 60px 顶栏杠
+        setCollapsed(false);
+        collapsedRef.current = false;
+        if (layout.mainCollapsed) {
+          try {
+            await setMainCollapsed(false);
+          } catch {
+            // 清折叠标志失败不挡启动
+          }
+        }
+        if (native && isSaneExpandedFrame(expandedMainRef.current)) {
+          await applyNativeShellSize(false);
         }
       } catch (error) {
         if (isAppError(error)) showToast(translateAppError(error));
@@ -255,12 +265,9 @@ export function AppShell() {
     };
   }, [native, readNativeFrame]);
 
-  async function toggleCollapse() {
-    const next = !collapsed;
+  async function minimizeWindow() {
     try {
-      await applyNativeShellSize(next);
-      await setMainCollapsed(next);
-      setCollapsed(next);
+      await minimizeMain();
     } catch (error) {
       if (isAppError(error)) showToast(translateAppError(error));
     }
@@ -330,6 +337,7 @@ export function AppShell() {
     }
   }
 
+  const mainMinimized = !native && mockUi.minimized;
   const mainHidden = !native && !mockUi.mainVisible;
   const showDemoPin = !native && mockUi.pinVisible;
   const showDemoCapsule = !native && mockUi.capsuleVisible;
@@ -375,7 +383,19 @@ export function AppShell() {
         </div>
       ) : null}
 
-      {mainHidden ? (
+      {mainMinimized ? (
+        <div className={styles.trayHint}>
+          <p>主窗已最小化（浏览器演示）。真机会整窗消失，可从 Windows 任务栏点图标恢复。</p>
+          <button
+            type="button"
+            onClick={() => {
+              void unminimizeMain();
+            }}
+          >
+            恢复主窗
+          </button>
+        </div>
+      ) : mainHidden ? (
         <div className={styles.trayHint}>
           <p>主窗已隐藏（浏览器模拟托盘）。真机关闭主窗会进系统托盘，进程不退出。</p>
           <button
@@ -438,10 +458,11 @@ export function AppShell() {
               <button
                 type="button"
                 className={styles.wbtn}
-                title={collapsed ? "展开" : "折叠"}
-                onClick={() => void toggleCollapse()}
+                title="最小化"
+                aria-label="最小化"
+                onClick={() => void minimizeWindow()}
               >
-                {collapsed ? "▢" : "—"}
+                —
               </button>
               <button
                 type="button"
