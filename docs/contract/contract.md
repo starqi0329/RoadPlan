@@ -2,8 +2,8 @@
 
 | 项目 | 内容 |
 | --- | --- |
-| 版本 | 0.2.2 |
-| 状态 | 冻结（切片 2 复核澄清） |
+| 版本 | 0.2.3 |
+| 状态 | 冻结（切片 3 复核澄清） |
 | 源头 | Rust：`src-tauri/src/domain/`；前端类型由它生成到 `src/bindings.ts` |
 | 修改权限 | 只有组织者能改；流程见 `docs/standards/git.md` 与 `docs/templates/contract-change.md` |
 
@@ -292,7 +292,7 @@ type NowInfo = { now: Timestamp; date: LocalDate; minute: Minute; periods: Perio
 - **R22 时段复盘门槛**：时段开始时间点晚于当前时间时，`save_review` 返回 `too_early`。
 - **R23 时段复盘唯一**：同一日期同一时段只有一份，再次 `save_review` 覆盖 note 并重新计算统计快照。
 - **R24 目标复盘**：每次 `save_review` 新增一份。
-- **R25 统计快照**：时段复盘统计该日期该时段的计划；目标复盘统计挂在该目标及其下级目标下的全部计划。`overdue` 为保存时状态为 overdue 的数量；`focusMinutes` 为已完成计划的 `end - start` 之和。`update_review` 只改 note，不改统计。
+- **R25 统计快照**：时段复盘统计该日期该时段的计划；目标复盘统计挂在该目标及其下级目标（**含已删除下级**，与 R15 累积口径一致）下的全部计划。`overdue` 为保存时状态为 overdue 的数量；`focusMinutes` 为已完成计划的 `end - start` 之和。`update_review` 只改 note，不改统计。
 
 ### 4.6 操作记录
 
@@ -327,6 +327,7 @@ type AppError =
 
 | 版本 | 日期 | 内容 |
 | --- | --- | --- |
+| 0.2.3 | 2026-11-26 | 澄清 R25：目标复盘统计含已删除下级，与 R15 一致 |
 | 0.2.2 | 2026-11-26 | 澄清 R13/R14：parent_required 为所缺上级；年带上级与周期错误用 validation |
 | 0.2.1 | 2026-11-26 | 澄清 R12：半开区间相交，首尾相接不算重叠 |
 | 0.2.0 | 2026-11-26 | 首个冻结版本 |
