@@ -4,7 +4,7 @@ use chrono::{DateTime, Datelike, FixedOffset, NaiveDate, Timelike};
 
 use super::{
     GoalLevel, GoalProgress, Milestone, MilestoneState, NowInfo, Periods, PlanKind, PlanOutcome,
-    PlanStatus, Segment,
+    PlanStatus, ReviewStats, Segment,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -122,6 +122,58 @@ pub fn segment_of(start: u16) -> Segment {
         Segment::Afternoon
     } else {
         Segment::Evening
+    }
+}
+
+/// 时段开始分钟：morning 0、afternoon 720、evening 1080。
+pub fn segment_start_minute(segment: Segment) -> u16 {
+    match segment {
+        Segment::Morning => 0,
+        Segment::Afternoon => 12 * 60,
+        Segment::Evening => 18 * 60,
+    }
+}
+
+/// R22：时段开始时间点晚于当前时间时，复盘太早。
+pub fn segment_review_too_early(
+    review_date: NaiveDate,
+    segment: Segment,
+    today: NaiveDate,
+    minute: u16,
+) -> bool {
+    if review_date > today {
+        return true;
+    }
+    if review_date < today {
+        return false;
+    }
+    minute < segment_start_minute(segment)
+}
+
+/// R25：按保存当时的状态与时长汇总复盘统计。
+pub fn compute_review_stats(items: &[(u16, u16, PlanStatus)]) -> ReviewStats {
+    let planned = u32::try_from(items.len()).unwrap_or(u32::MAX);
+    let mut done = 0u32;
+    let mut skipped = 0u32;
+    let mut overdue = 0u32;
+    let mut focus_minutes = 0u32;
+    for (start, end, status) in items {
+        match status {
+            PlanStatus::Done => {
+                done = done.saturating_add(1);
+                focus_minutes = focus_minutes.saturating_add(u32::from(end.saturating_sub(*start)));
+            }
+            PlanStatus::Skipped => skipped = skipped.saturating_add(1),
+            PlanStatus::Overdue => overdue = overdue.saturating_add(1),
+            PlanStatus::Upcoming | PlanStatus::Active => {}
+        }
+    }
+    ReviewStats {
+        planned,
+        done,
+        skipped,
+        overdue,
+        focus_minutes,
     }
 }
 
@@ -346,6 +398,55 @@ mod tests {
         assert_eq!(segment_of(11 * 60 + 59), Segment::Morning);
         assert_eq!(segment_of(12 * 60), Segment::Afternoon);
         assert_eq!(segment_of(18 * 60), Segment::Evening);
+    }
+
+    #[test]
+    fn segment_review_rejects_future_segment_start() {
+        let today = date("2026-11-26");
+        assert!(segment_review_too_early(
+            today,
+            Segment::Afternoon,
+            today,
+            10 * 60 + 42
+        ));
+        assert!(!segment_review_too_early(
+            today,
+            Segment::Morning,
+            today,
+            10 * 60 + 42
+        ));
+        assert!(!segment_review_too_early(
+            date("2026-11-25"),
+            Segment::Evening,
+            today,
+            10 * 60
+        ));
+        assert!(segment_review_too_early(
+            date("2026-11-27"),
+            Segment::Morning,
+            today,
+            0
+        ));
+    }
+
+    #[test]
+    fn review_stats_snapshot_counts_status_and_focus_minutes() {
+        let items = [
+            (9 * 60, 10 * 60, PlanStatus::Done),
+            (10 * 60, 11 * 60, PlanStatus::Overdue),
+            (14 * 60, 15 * 60, PlanStatus::Skipped),
+            (16 * 60, 17 * 60, PlanStatus::Active),
+        ];
+        assert_eq!(
+            compute_review_stats(&items),
+            ReviewStats {
+                planned: 4,
+                done: 1,
+                skipped: 1,
+                overdue: 1,
+                focus_minutes: 60,
+            }
+        );
     }
 
     #[test]

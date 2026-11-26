@@ -8,6 +8,8 @@ mod goal_ops;
 mod goal_store;
 mod plan_ops;
 mod plan_store;
+mod review_ops;
+mod review_store;
 
 use tauri::Manager;
 

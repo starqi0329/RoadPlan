@@ -15,6 +15,7 @@ use crate::error::AppError;
 use crate::events::{DataChanged, MinuteTick};
 use crate::goal_ops;
 use crate::plan_ops::{self, Clock};
+use crate::review_ops;
 
 fn not_done<T>(command: &str) -> Result<T, AppError> {
     Err(AppError::not_done(command))
@@ -46,6 +47,10 @@ fn emit_goal_changed(app: &AppHandle, with_plan: bool) -> Result<(), AppError> {
     } else {
         emit_changed(app, &["goal", "audit"])
     }
+}
+
+fn emit_review_changed(app: &AppHandle) -> Result<(), AppError> {
+    emit_changed(app, &["review", "audit"])
 }
 
 #[tauri::command]
@@ -353,30 +358,48 @@ pub fn remove_milestone(
 
 #[tauri::command]
 #[specta::specta]
-pub fn get_segment_review(date: String, segment: Segment) -> Result<Option<Review>, AppError> {
-    let _ = (date, segment);
-    not_done("get_segment_review")
+pub fn get_segment_review(
+    db: State<'_, Db>,
+    date: String,
+    segment: Segment,
+) -> Result<Option<Review>, AppError> {
+    let conn = db::lock_conn(&db)?;
+    review_ops::get_segment_review(&conn, &date, segment)
 }
 
 #[tauri::command]
 #[specta::specta]
-pub fn list_goal_reviews(goal_id: String) -> Result<Vec<Review>, AppError> {
-    let _ = goal_id;
-    not_done("list_goal_reviews")
+pub fn list_goal_reviews(db: State<'_, Db>, goal_id: String) -> Result<Vec<Review>, AppError> {
+    let conn = db::lock_conn(&db)?;
+    review_ops::list_goal_reviews(&conn, &goal_id)
 }
 
 #[tauri::command]
 #[specta::specta]
-pub fn save_review(input: SaveReviewInput) -> Result<Review, AppError> {
-    let _ = input;
-    not_done("save_review")
+pub fn save_review(
+    app: AppHandle,
+    db: State<'_, Db>,
+    input: SaveReviewInput,
+) -> Result<Review, AppError> {
+    let mut conn = db::lock_conn(&db)?;
+    let result =
+        with_clock(|clock| review_ops::save_review(&mut conn, input.target, input.note, clock))?;
+    emit_review_changed(&app)?;
+    Ok(result)
 }
 
 #[tauri::command]
 #[specta::specta]
-pub fn update_review(id: String, note: String) -> Result<Review, AppError> {
-    let _ = (id, note);
-    not_done("update_review")
+pub fn update_review(
+    app: AppHandle,
+    db: State<'_, Db>,
+    id: String,
+    note: String,
+) -> Result<Review, AppError> {
+    let mut conn = db::lock_conn(&db)?;
+    let result = with_clock(|clock| review_ops::update_review(&mut conn, &id, note, clock))?;
+    emit_review_changed(&app)?;
+    Ok(result)
 }
 
 #[tauri::command]

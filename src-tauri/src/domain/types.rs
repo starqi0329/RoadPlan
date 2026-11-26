@@ -290,7 +290,7 @@ pub enum ReviewTarget {
     Goal { goal_id: String },
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct ReviewStats {
     pub planned: u32,
