@@ -62,6 +62,27 @@ export async function hideMainToTray(): Promise<void> {
   );
 }
 
+/** 系统最小化：整窗消失，可从任务栏恢复。不用 set_main_collapsed 留顶栏杠。 */
+export async function minimizeMain(): Promise<void> {
+  if (!isTauri()) {
+    await mockWindow.minimizeMain();
+    return;
+  }
+  const { getCurrentWindow } = await import("@tauri-apps/api/window");
+  await getCurrentWindow().minimize();
+}
+
+export async function unminimizeMain(): Promise<void> {
+  if (!isTauri()) {
+    await mockWindow.unminimizeMain();
+    return;
+  }
+  const { getCurrentWindow } = await import("@tauri-apps/api/window");
+  const win = getCurrentWindow();
+  await win.unminimize();
+  await win.setFocus();
+}
+
 export async function showMain(): Promise<void> {
   await withWindowFallback(
     async () => {

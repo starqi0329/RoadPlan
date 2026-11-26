@@ -16,9 +16,11 @@ let layout: WindowLayout = {
   capsuleVisible: false,
 };
 
-/** 浏览器演示：折叠 / 胶囊 / 置顶可见性（不写库）。 */
+/** 浏览器演示：折叠 / 最小化 / 胶囊 / 置顶可见性（不写库）。 */
 export type MockWindowUi = {
   mainVisible: boolean;
+  /** 系统最小化演示（与托盘隐藏区分）。 */
+  minimized: boolean;
   collapsed: boolean;
   pinVisible: boolean;
   capsuleVisible: boolean;
@@ -27,6 +29,7 @@ export type MockWindowUi = {
 
 let ui: MockWindowUi = {
   mainVisible: true,
+  minimized: false,
   collapsed: false,
   pinVisible: false,
   capsuleVisible: false,
@@ -70,12 +73,26 @@ export async function setMainCollapsed(collapsed: boolean): Promise<null> {
 
 export async function hideMainToTray(): Promise<null> {
   ui.mainVisible = false;
+  ui.minimized = false;
+  emit();
+  return null;
+}
+
+export async function minimizeMain(): Promise<null> {
+  ui.minimized = true;
+  emit();
+  return null;
+}
+
+export async function unminimizeMain(): Promise<null> {
+  ui.minimized = false;
   emit();
   return null;
 }
 
 export async function showMain(): Promise<null> {
   ui.mainVisible = true;
+  ui.minimized = false;
   ui.capsuleVisible = false;
   layout.capsuleVisible = false;
   emit();
@@ -126,6 +143,7 @@ export async function quitApp(): Promise<null> {
   // 浏览器演示：无法真正退出，仅复位。
   ui = {
     mainVisible: true,
+    minimized: false,
     collapsed: false,
     pinVisible: false,
     capsuleVisible: false,
@@ -146,6 +164,7 @@ export function resetMockWindow(): void {
   };
   ui = {
     mainVisible: true,
+    minimized: false,
     collapsed: false,
     pinVisible: false,
     capsuleVisible: false,
