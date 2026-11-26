@@ -52,6 +52,8 @@ pub fn run() {
         .on_window_event(|window, event| {
             if let WindowEvent::CloseRequested { api, .. } = event {
                 match window.label() {
+                    // 系统关闭的权威拦截只在这里：进托盘，不退出。
+                    // 前端 × 应只调 hide_main_to_tray；不要再二次 hide 抢状态。
                     MAIN_LABEL => {
                         api.prevent_close();
                         let _ = window_ops::hide_main_to_tray(window.app_handle());
