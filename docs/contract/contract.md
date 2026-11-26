@@ -2,8 +2,8 @@
 
 | 项目 | 内容 |
 | --- | --- |
-| 版本 | 0.3.0 |
-| 状态 | 冻结（切片 4 窗口与托盘） |
+| 版本 | 0.3.1 |
+| 状态 | 冻结（切片 5 复核澄清） |
 | 源头 | Rust：`src-tauri/src/domain/`；前端类型由它生成到 `src/bindings.ts` |
 | 修改权限 | 只有组织者能改；流程见 `docs/standards/git.md` 与 `docs/templates/contract-change.md` |
 
@@ -176,6 +176,7 @@ type AuditEvent = {
 };
 
 type AuditPage = { items: AuditEvent[]; total: number };
+// total = 库中全部操作记录条数；与 limit / beforeId 无关，翻页时不变。
 ```
 
 ### 2.5 时间与周期
@@ -245,6 +246,10 @@ type NowInfo = { now: Timestamp; date: LocalDate; minute: Minute; periods: Perio
 | 命令 | 参数 | 返回 |
 | --- | --- | --- |
 | `list_audit` | `limit: number, beforeId: Id \| null` | `AuditPage` |
+
+- `beforeId` 为 null：从最新一条起取至多 `limit` 条。
+- `beforeId` 有值：取该 id 对应记录**更早**的下一页；该 id 不存在时返回 `not_found`（entity 为 `audit`）。
+- `total` 始终为全部记录条数，不随本页缩小。
 
 ### 3.6 窗口
 
@@ -331,7 +336,7 @@ type WindowLayout = {
 ### 4.6 操作记录
 
 - **R26 留痕**：每个成功的写命令恰好写一条操作记录（`copy_plans` 写一条，摘要中写数量；`delete_goal` 写一条，摘要中写影响数量）。失败的命令不写。读命令不写。
-- **R27 排序**：按 at 倒序，同一时间按 id 倒序。
+- **R27 排序**：按 at 倒序，同一时间按 id 倒序。`list_audit` 的 `total` 与翻页口径见 §3.5。
 
 ### 4.7 窗口
 
@@ -369,6 +374,7 @@ type AppError =
 
 | 版本 | 日期 | 内容 |
 | --- | --- | --- |
+| 0.3.1 | 2026-11-26 | 澄清 list_audit：total 为全库条数；非法 beforeId → not_found |
 | 0.3.0 | 2026-11-26 | 追加窗口命令与 R28–R32（主窗/置顶/胶囊/托盘） |
 | 0.2.3 | 2026-11-26 | 澄清 R25：目标复盘统计含已删除下级，与 R15 一致 |
 | 0.2.2 | 2026-11-26 | 澄清 R13/R14：parent_required 为所缺上级；年带上级与周期错误用 validation |
