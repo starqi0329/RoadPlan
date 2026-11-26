@@ -46,6 +46,7 @@ export function PlanItem({
     untreated &&
     (plan.status === "upcoming" || plan.status === "active" || plan.status === "overdue");
   const showSkip = untreated;
+  const showActions = (showComplete || showSkip) && !actionsDisabled;
 
   return (
     <article className={`${styles.item} ${statusClass}`}>
@@ -59,38 +60,42 @@ export function PlanItem({
       <div className={styles.card}>
         <div className={styles.top}>
           <h3 className={styles.title}>{plan.title}</h3>
-          <span className={`${styles.badge} ${badgeClass}`}>{statusLabel(plan.status)}</span>
         </div>
-        <div className={styles.meta}>
-          <span>{kindLabel(plan.kind)}</span>
-          {plan.late ? <span className={styles.late}>迟</span> : null}
-          {plan.acceptance ? <span>{plan.acceptance}</span> : null}
-        </div>
-        {(showComplete || showSkip) && !actionsDisabled ? (
-          <div className={styles.actions}>
-            {showComplete ? (
-              <button
-                type="button"
-                className={`${styles.action} ${styles.actionPrimary}`}
-                disabled={!plan.canComplete || completing || skipping}
-                title={plan.canComplete ? "标记完成" : "还没到开始时间，不能标记完成"}
-                onClick={() => onComplete(plan.id)}
-              >
-                {completing ? "…" : "完成"}
-              </button>
-            ) : null}
-            {showSkip ? (
-              <button
-                type="button"
-                className={styles.action}
-                disabled={completing || skipping}
-                onClick={() => onSkip(plan.id)}
-              >
-                {skipping ? "…" : "跳过"}
-              </button>
-            ) : null}
+
+        <div className={styles.metaRow}>
+          <div className={styles.meta}>
+            <span className={`${styles.badge} ${badgeClass}`}>{statusLabel(plan.status)}</span>
+            <span>{kindLabel(plan.kind)}</span>
+            {plan.late ? <span className={styles.late}>迟</span> : null}
+            {plan.acceptance ? <span>{plan.acceptance}</span> : null}
           </div>
-        ) : null}
+
+          {showActions ? (
+            <div className={styles.actions}>
+              {showComplete ? (
+                <button
+                  type="button"
+                  className={`${styles.action} ${styles.actionPrimary}`}
+                  disabled={!plan.canComplete || completing || skipping}
+                  title={plan.canComplete ? "标记完成" : "还没到开始时间，不能标记完成"}
+                  onClick={() => onComplete(plan.id)}
+                >
+                  {completing ? "…" : "完成"}
+                </button>
+              ) : null}
+              {showSkip ? (
+                <button
+                  type="button"
+                  className={styles.action}
+                  disabled={completing || skipping}
+                  onClick={() => onSkip(plan.id)}
+                >
+                  {skipping ? "…" : "跳过"}
+                </button>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
       </div>
     </article>
   );

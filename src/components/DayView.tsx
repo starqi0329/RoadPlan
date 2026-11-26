@@ -1,8 +1,12 @@
+import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
+import { listGoals } from "../api/goals";
+import { isAppError } from "../api/result";
+import type { PlanView } from "../bindings";
+import { isUnimplemented } from "../errors/appError";
 import { useDayPlans } from "../hooks/useDayPlans";
 import { formatDateHeading, formatMinute, statusLabel } from "../lib/format";
 import { groupPlansBySegment } from "../lib/segments";
-import type { PlanView } from "../bindings";
 import { CreatePlanForm } from "./CreatePlanForm";
 import { EmptyState } from "./EmptyState";
 import { PlanItem } from "./PlanItem";
@@ -10,16 +14,32 @@ import styles from "./DayView.module.css";
 
 type Filter = "all" | "todo" | "done";
 
+type Props = {
+  onOpenGoals: () => void;
+};
+
 function matchesFilter(plan: PlanView, filter: Filter): boolean {
   if (filter === "all") return true;
   if (filter === "done") return plan.status === "done" || plan.status === "skipped";
   return plan.status === "upcoming" || plan.status === "active" || plan.status === "overdue";
 }
 
-export function DayView() {
+export function DayView({ onOpenGoals }: Props) {
   const day = useDayPlans();
   const [filter, setFilter] = useState<Filter>("all");
   const [creating, setCreating] = useState(false);
+
+  const weekGoalsQuery = useQuery({
+    queryKey: ["goals", "week"],
+    queryFn: async () => {
+      try {
+        return await listGoals("week", null);
+      } catch (error) {
+        if (isAppError(error) && isUnimplemented(error)) return [];
+        throw error;
+      }
+    },
+  });
 
   const visible = useMemo(
     () => day.plans.filter((plan) => matchesFilter(plan, filter)),
@@ -59,6 +79,14 @@ export function DayView() {
             时序
             <small>日计划</small>
           </div>
+          <nav className={styles.nav} aria-label="主区域">
+            <button type="button" aria-current="page">
+              日计划
+            </button>
+            <button type="button" onClick={onOpenGoals}>
+              目标
+            </button>
+          </nav>
           <div className={styles.datebox}>
             <span className={styles.dateMain}>{day.date ? formatDateHeading(day.date) : "—"}</span>
             <span className={styles.dateSub}>
@@ -80,7 +108,7 @@ export function DayView() {
         {day.banner ? <div className={styles.banner}>{day.banner}</div> : null}
         {day.backendGap ? (
           <div className={styles.gap}>
-            计划读写这一切片还没接上后端。界面可以先看布局；真机持久化要等后端合并后再联调。
+            计划读写还没接上后端。浏览器可用演示数据；真机持久化要等后端就绪后再联调。
           </div>
         ) : null}
 
@@ -198,6 +226,7 @@ export function DayView() {
       {creating && !blocked ? (
         <CreatePlanForm
           busy={day.creating}
+          weekGoals={weekGoalsQuery.data ?? []}
           onClose={() => setCreating(false)}
           onSubmit={day.createPlan}
         />

@@ -1,25 +1,28 @@
 import { useState, type FormEvent } from "react";
-import type { PlanFields, PlanKind } from "../bindings";
+import type { GoalView, PlanFields, PlanKind } from "../bindings";
 import { parseTimeInput } from "../lib/format";
 import styles from "./CreatePlanForm.module.css";
 
 type Props = {
   busy: boolean;
+  weekGoals: GoalView[];
   onClose: () => void;
   onSubmit: (fields: PlanFields) => Promise<unknown>;
 };
 
 const KIND_OPTIONS: { value: PlanKind; label: string }[] = [
+  { value: "core", label: "核心" },
   { value: "work", label: "工作" },
   { value: "routine", label: "日常" },
   { value: "review", label: "复盘" },
 ];
 
-export function CreatePlanForm({ busy, onClose, onSubmit }: Props) {
+export function CreatePlanForm({ busy, weekGoals, onClose, onSubmit }: Props) {
   const [title, setTitle] = useState("");
   const [startText, setStartText] = useState("09:00");
   const [endText, setEndText] = useState("10:00");
   const [kind, setKind] = useState<PlanKind>("work");
+  const [weekGoalId, setWeekGoalId] = useState("");
   const [acceptance, setAcceptance] = useState("");
   const [error, setError] = useState<string | null>(null);
 
@@ -40,6 +43,16 @@ export function CreatePlanForm({ busy, onClose, onSubmit }: Props) {
       setError("请填写标题");
       return;
     }
+    if (kind === "core") {
+      if (weekGoals.length === 0) {
+        setError("还没有未删除的周目标，请先到「目标」里新建一条周目标");
+        return;
+      }
+      if (!weekGoalId) {
+        setError("核心计划必须选择所属周目标");
+        return;
+      }
+    }
 
     const fields: PlanFields = {
       start,
@@ -47,7 +60,7 @@ export function CreatePlanForm({ busy, onClose, onSubmit }: Props) {
       title: title.trim(),
       acceptance: acceptance.trim(),
       kind,
-      weekGoalId: null,
+      weekGoalId: kind === "core" ? weekGoalId : weekGoalId || null,
       note: null,
     };
 
@@ -68,7 +81,7 @@ export function CreatePlanForm({ busy, onClose, onSubmit }: Props) {
       >
         <div className={styles.head}>
           <h2>新建计划</h2>
-          <p>本切片先支持非核心种类</p>
+          <p>核心计划需挂周目标</p>
         </div>
 
         <div className={styles.field}>
@@ -108,7 +121,11 @@ export function CreatePlanForm({ busy, onClose, onSubmit }: Props) {
           <select
             id="plan-kind"
             value={kind}
-            onChange={(event) => setKind(event.target.value as PlanKind)}
+            onChange={(event) => {
+              const next = event.target.value as PlanKind;
+              setKind(next);
+              if (next !== "core") setWeekGoalId("");
+            }}
           >
             {KIND_OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>
@@ -117,6 +134,28 @@ export function CreatePlanForm({ busy, onClose, onSubmit }: Props) {
             ))}
           </select>
         </div>
+
+        {kind === "core" ? (
+          <div className={styles.field}>
+            <label htmlFor="plan-week-goal">所属周目标</label>
+            {weekGoals.length === 0 ? (
+              <p className={styles.error}>当前没有未删除的周目标。请先到「目标」页新建周目标。</p>
+            ) : (
+              <select
+                id="plan-week-goal"
+                value={weekGoalId}
+                onChange={(event) => setWeekGoalId(event.target.value)}
+              >
+                <option value="">请选择周目标</option>
+                {weekGoals.map((goal) => (
+                  <option key={goal.id} value={goal.id}>
+                    {goal.title}（{goal.period}）
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+        ) : null}
 
         <div className={styles.field}>
           <label htmlFor="plan-acceptance">验收方式（可空）</label>
