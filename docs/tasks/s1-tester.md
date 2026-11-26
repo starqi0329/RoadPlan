@@ -54,4 +54,4 @@ pnpm exec playwright test
 
 ## 做完后
 
-把汇报写到 `docs/reports/s1/测试.md` 并提交。最前面「给人看的产出」写清：可以核对什么、人要亲手点什么、还没覆盖什么。真机步骤用 `docs/templates/manual-acceptance.md`。有界面验收就附截图。不要合并到 `main`。
+把汇报写到 `docs/reports/s1/测试.md` 并提交，再把 `qa/s1-acceptance` 推到 `origin`。最前面「给人看的产出」写清：可以核对什么、人要亲手点什么、还没覆盖什么。真机步骤用 `docs/templates/manual-acceptance.md`。有界面验收就附截图。可以推送自己的分支，禁止合并到 `main`。
