@@ -8,7 +8,7 @@ export function translateAppError(error: AppError): string {
     case "validation":
       return error.message || `${error.field} 填写有误`;
     case "too_early":
-      return `还没到开始时间（${formatStartsAt(error.startsAt)}），不能标记完成`;
+      return `还没到开始时间（${formatStartsAt(error.startsAt)}）`;
     case "locked":
       return error.reason === "ended" ? "这条计划已结束，不能这样改" : "这条计划已经处理过了";
     case "parent_required":

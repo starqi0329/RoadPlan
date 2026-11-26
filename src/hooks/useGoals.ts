@@ -173,6 +173,7 @@ export function useGoals() {
     backendGap,
     banner,
     toast,
+    setToast,
     goals: goalsQuery.data ?? [],
     deleted: deletedQuery.data ?? [],
     loading: goalsQuery.isLoading || deletedQuery.isLoading,

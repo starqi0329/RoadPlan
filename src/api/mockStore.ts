@@ -1,4 +1,4 @@
-import type { GoalView, Milestone, NowInfo, PlanView } from "../bindings";
+import type { GoalView, Milestone, NowInfo, PlanView, Review } from "../bindings";
 
 export type StoredPlan = Omit<PlanView, "status" | "canComplete" | "editable" | "late">;
 
@@ -6,10 +6,12 @@ export type StoredGoal = Omit<GoalView, "progress" | "childCount">;
 
 export const planStore = new Map<string, StoredPlan>();
 export const goalStore = new Map<string, StoredGoal>();
+export const reviewStore = new Map<string, Review>();
 
 let planSeed = 0;
 let goalSeed = 0;
 let milestoneSeed = 0;
+let reviewSeed = 0;
 
 export function nextPlanId(): string {
   planSeed += 1;
@@ -26,27 +28,50 @@ export function nextMilestoneId(): string {
   return `mock-ms-${String(milestoneSeed).padStart(4, "0")}`;
 }
 
-export function nowInfoFromClock(date = new Date()): NowInfo {
+export function nextReviewId(): string {
+  reviewSeed += 1;
+  return `mock-review-${String(reviewSeed).padStart(4, "0")}`;
+}
+
+/** 浏览器截图/演示可写入 sessionStorage「roadplan-mock-now」(ISO 字符串) 固定时钟。 */
+function resolveClock(date?: Date): Date {
+  if (date) return date;
+  if (typeof window !== "undefined") {
+    try {
+      const raw = window.sessionStorage.getItem("roadplan-mock-now");
+      if (raw) {
+        const parsed = new Date(raw);
+        if (!Number.isNaN(parsed.getTime())) return parsed;
+      }
+    } catch {
+      // 忽略不可用的 storage
+    }
+  }
+  return new Date();
+}
+
+export function nowInfoFromClock(date?: Date): NowInfo {
+  const clock = resolveClock(date);
   const localDate = [
-    date.getFullYear(),
-    String(date.getMonth() + 1).padStart(2, "0"),
-    String(date.getDate()).padStart(2, "0"),
+    clock.getFullYear(),
+    String(clock.getMonth() + 1).padStart(2, "0"),
+    String(clock.getDate()).padStart(2, "0"),
   ].join("-");
-  const minute = date.getHours() * 60 + date.getMinutes();
-  const offset = -date.getTimezoneOffset();
+  const minute = clock.getHours() * 60 + clock.getMinutes();
+  const offset = -clock.getTimezoneOffset();
   const sign = offset >= 0 ? "+" : "-";
   const abs = Math.abs(offset);
   const tz = `${sign}${String(Math.floor(abs / 60)).padStart(2, "0")}:${String(abs % 60).padStart(2, "0")}`;
-  const stamp = `${localDate}T${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}:${String(date.getSeconds()).padStart(2, "0")}${tz}`;
-  const week = Math.floor((date.getDate() - 1) / 7) + 1;
+  const stamp = `${localDate}T${String(clock.getHours()).padStart(2, "0")}:${String(clock.getMinutes()).padStart(2, "0")}:${String(clock.getSeconds()).padStart(2, "0")}${tz}`;
+  const week = Math.floor((clock.getDate() - 1) / 7) + 1;
   return {
     now: stamp,
     date: localDate,
     minute,
     periods: {
-      year: String(date.getFullYear()),
-      month: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`,
-      week: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-W${week}`,
+      year: String(clock.getFullYear()),
+      month: `${clock.getFullYear()}-${String(clock.getMonth() + 1).padStart(2, "0")}`,
+      week: `${clock.getFullYear()}-${String(clock.getMonth() + 1).padStart(2, "0")}-W${week}`,
     },
   };
 }
@@ -54,9 +79,11 @@ export function nowInfoFromClock(date = new Date()): NowInfo {
 export function resetMockStore(): void {
   planStore.clear();
   goalStore.clear();
+  reviewStore.clear();
   planSeed = 0;
   goalSeed = 0;
   milestoneSeed = 0;
+  reviewSeed = 0;
 }
 
 export function cloneMilestones(items: Milestone[]): Milestone[] {
