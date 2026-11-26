@@ -38,6 +38,17 @@ describe("mock 窗口", () => {
     expect(getMockWindowUi().mainVisible).toBe(true);
   });
 
+  it("hide → show → hide 可重复进托盘", async () => {
+    await hideMainToTray();
+    expect(getMockWindowUi().mainVisible).toBe(false);
+    await showMain();
+    expect(getMockWindowUi().mainVisible).toBe(true);
+    await hideMainToTray();
+    expect(getMockWindowUi().mainVisible).toBe(false);
+    await showMain();
+    expect(getMockWindowUi().mainVisible).toBe(true);
+  });
+
   it("showPin / showCapsule 打开可见性", async () => {
     await showPin();
     await showCapsule();

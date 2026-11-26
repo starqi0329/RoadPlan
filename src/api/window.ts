@@ -62,6 +62,46 @@ export async function hideMainToTray(): Promise<void> {
   );
 }
 
+/**
+ * 关闭进托盘（可重复调用）。
+ * 根因对策：先走 hide_main_to_tray；若窗仍可见再直接 hide()，
+ * 避免托盘恢复后第二次 × 命令返回成功但窗不消失。
+ */
+export async function closeMainToTray(): Promise<void> {
+  if (!isTauri()) {
+    await mockWindow.hideMainToTray();
+    return;
+  }
+
+  let commandError: unknown = null;
+  try {
+    unwrapResult(await commands.hideMainToTray());
+  } catch (error) {
+    commandError = error;
+  }
+
+  const { getCurrentWindow } = await import("@tauri-apps/api/window");
+  const win = getCurrentWindow();
+  let visible = true;
+  try {
+    visible = await win.isVisible();
+  } catch {
+    visible = true;
+  }
+
+  if (visible) {
+    try {
+      await win.hide();
+      visible = false;
+    } catch (fallbackError) {
+      if (commandError) throw commandError;
+      throw fallbackError;
+    }
+  }
+
+  if (commandError && visible) throw commandError;
+}
+
 /** 系统最小化：整窗消失，可从任务栏恢复。不用 set_main_collapsed 留顶栏杠。 */
 export async function minimizeMain(): Promise<void> {
   if (!isTauri()) {
