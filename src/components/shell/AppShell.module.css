@@ -23,6 +23,14 @@
   background: linear-gradient(160deg, rgba(255, 255, 255, 0.96), rgba(246, 246, 248, 0.98));
 }
 
+/* 折叠时外层不要继续撑满窗口，避免顶栏下大块空白壳 */
+.desktop[data-shell="native"][data-collapsed="true"] {
+  height: auto;
+  min-height: 0;
+  align-items: flex-start;
+  background: transparent;
+}
+
 .demoChrome {
   position: absolute;
   inset: 0;
@@ -169,12 +177,17 @@
   border: 0;
 }
 
-.collapsed {
+/* 折叠只留顶栏；覆盖 native 的 height:100%，禁止整窗空白壳 */
+.collapsed,
+.desktop[data-shell="native"] .collapsed {
   height: 60px;
+  min-height: 60px;
+  max-height: 60px;
 }
 
-.desktop[data-shell="native"] .collapsed {
-  height: 100%;
+.collapsed .body,
+.collapsed .statusSlot {
+  display: none;
 }
 
 .dragging .halo1,
