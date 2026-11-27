@@ -264,23 +264,39 @@ export function AppShell() {
   async function hideToCapsule() {
     try {
       await showCapsule();
-      await closeMainToTray();
-      if (!native) {
-        showToast("已显示胶囊，主窗进托盘（演示）");
-      } else {
-        showToast("已隐藏到胶囊 / 托盘");
-      }
     } catch (error) {
       if (isAppError(error)) showToast(translateAppError(error));
+      else showToast("打开胶囊失败，主窗未隐藏");
+      return;
+    }
+
+    try {
+      await closeMainToTray();
+      if (!native) {
+        showToast("胶囊已显示，主窗已进托盘（演示）");
+      } else {
+        showToast("胶囊已显示，主窗已进托盘");
+      }
+    } catch (error) {
+      if (isAppError(error)) {
+        showToast(`胶囊已显示，但隐藏主窗失败：${translateAppError(error)}`);
+      } else {
+        showToast("胶囊已显示，但隐藏主窗失败");
+      }
     }
   }
 
   async function openPin() {
     try {
       await showPin();
-      if (!native) showToast("已打开置顶小窗（浏览器演示浮层）");
+      if (!native) {
+        showToast("已打开置顶小窗（浏览器演示浮层；真机为独立窗）");
+      } else {
+        showToast("已打开置顶小窗");
+      }
     } catch (error) {
       if (isAppError(error)) showToast(translateAppError(error));
+      else showToast("打开置顶小窗失败");
     }
   }
 

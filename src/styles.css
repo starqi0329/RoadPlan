@@ -54,6 +54,20 @@ html[data-shell="native"][data-collapsed="true"] #root {
   background: transparent;
 }
 
+/* 置顶 / 胶囊副窗：铺满系统窗，不要主壳桌面垫色 */
+html[data-window-role="pin"],
+html[data-window-role="pin"] body,
+html[data-window-role="pin"] #root,
+html[data-window-role="capsule"],
+html[data-window-role="capsule"] body,
+html[data-window-role="capsule"] #root {
+  height: 100%;
+  min-height: 100%;
+  margin: 0;
+  background: transparent;
+  overflow: hidden;
+}
+
 button,
 input,
 select {
