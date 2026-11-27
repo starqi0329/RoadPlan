@@ -1,5 +1,5 @@
 import { isTauri } from "@tauri-apps/api/core";
-import { commands, type WindowLayout } from "../bindings";
+import { commands, type AppError, type WindowLayout } from "../bindings";
 import { isUnimplemented } from "../errors/appError";
 import * as mockWindow from "./mockWindow";
 import { isAppError, unwrapResult } from "./result";
@@ -21,6 +21,44 @@ async function withWindowFallback<T>(
   } catch (error) {
     if (isAppError(error) && isUnimplemented(error)) return mockCall();
     throw error;
+  }
+}
+
+/**
+ * 真机：命令返回后核对副窗真的在、可见，并再顶一次置顶/聚焦。
+ * 避免「后端说成功、桌面上却没有小窗」被前端当成已打开。
+ */
+async function ensureSecondaryVisible(label: "pin" | "capsule"): Promise<void> {
+  if (!isTauri()) return;
+  const { WebviewWindow } = await import("@tauri-apps/api/webviewWindow");
+  const win = await WebviewWindow.getByLabel(label);
+  if (!win) {
+    const err: AppError = {
+      code: "not_found",
+      entity: "window",
+      id: label,
+    };
+    throw err;
+  }
+  try {
+    await win.setAlwaysOnTop(true);
+    await win.show();
+    if (label === "pin") await win.setFocus();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    const err: AppError = {
+      code: "internal",
+      message: `显示${label === "pin" ? "置顶" : "胶囊"}窗失败: ${message}`,
+    };
+    throw err;
+  }
+  const visible = await win.isVisible();
+  if (!visible) {
+    const err: AppError = {
+      code: "internal",
+      message: `${label === "pin" ? "置顶" : "胶囊"}窗已创建但仍不可见`,
+    };
+    throw err;
   }
 }
 
@@ -105,6 +143,7 @@ export async function showPin(): Promise<void> {
   await withWindowFallback(
     async () => {
       unwrapResult(await commands.showPin());
+      await ensureSecondaryVisible("pin");
     },
     () => mockWindow.showPin(),
   );
@@ -123,6 +162,7 @@ export async function showCapsule(): Promise<void> {
   await withWindowFallback(
     async () => {
       unwrapResult(await commands.showCapsule());
+      await ensureSecondaryVisible("capsule");
     },
     () => mockWindow.showCapsule(),
   );
