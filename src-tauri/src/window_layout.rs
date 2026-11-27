@@ -14,12 +14,13 @@ pub const MAIN_MIN_WIDTH: f64 = 640.0;
 pub const MAIN_MIN_HEIGHT: f64 = 480.0;
 
 /// 置顶窗：一张竖版时刻表卡片，不是横条。
-pub const PIN_MIN_WIDTH: f64 = 260.0;
-pub const PIN_MIN_HEIGHT: f64 = 240.0; // 卡片至少能放下头部 + 两条计划
+pub const PIN_MIN_WIDTH: f64 = 168.0; // 窄版卡片，192 宽是默认
+pub const PIN_MIN_HEIGHT: f64 = 150.0; // 卡片至少能放下头部 + 一条计划
 
-/// 旧版卡片默认宽度，存档里等于它的按新默认宽迁一次。
-const PIN_LEGACY_WIDTH: f64 = 320.0;
-const PIN_WIDTH: f64 = 288.0;
+/// 旧版卡片默认尺寸，存档里等于它的按新默认迁一次（320 是最早的横条版，288/192 是上一版）。
+const PIN_LEGACY_WIDTHS: [f64; 4] = [320.0, 288.0, 192.0, 170.0];
+const PIN_WIDTH: f64 = 175.0;
+const PIN_HEIGHT: f64 = 293.0;
 
 pub const CAPSULE_MIN_WIDTH: f64 = 150.0;
 pub const CAPSULE_MIN_HEIGHT: f64 = 36.0;
@@ -32,11 +33,11 @@ pub fn default_pin_frame() -> WindowFrame {
         x: 80.0,
         y: 96.0,
         width: PIN_WIDTH,
-        height: 288.0,
+        height: PIN_HEIGHT,
     }
 }
 
-/// 折叠胶囊：横向蓝色药丸。
+/// 折叠胶囊：白药丸 236×44，窗口就是这个尺寸，外轮廓靠窗口区域裁成半圆角。
 pub fn default_capsule_frame() -> WindowFrame {
     WindowFrame {
         x: 40.0,
@@ -69,9 +70,11 @@ pub fn resolve_pin_frame(stored: Option<&WindowFrame>) -> WindowFrame {
     match stored {
         Some(frame) if validate_frame("pin", frame, PIN_MIN_WIDTH, PIN_MIN_HEIGHT).is_ok() => {
             let mut resolved = frame.clone();
-            if (resolved.width - PIN_LEGACY_WIDTH).abs() < 1.0 {
+            if PIN_LEGACY_WIDTHS
+                .iter()
+                .any(|legacy| (resolved.width - legacy).abs() < 1.0)
+            {
                 resolved.width = default.width;
-                resolved.height = resolved.height.max(default.height);
             }
             resolved
         }
@@ -299,23 +302,25 @@ mod tests {
     #[test]
     fn default_pin_is_card_within_usable_range() {
         let pin = default_pin_frame();
-        assert!(pin.width >= 260.0 && pin.width <= 300.0);
-        assert!(pin.height >= 280.0 && pin.height <= 400.0);
+        assert!(pin.width >= 165.0 && pin.width <= 185.0);
+        assert!(pin.height >= 260.0 && pin.height <= 400.0);
         validate_frame("pin", &pin, PIN_MIN_WIDTH, PIN_MIN_HEIGHT).expect("pin ok");
     }
 
     #[test]
     fn resolve_pin_migrates_legacy_default_width_to_narrower_card() {
-        let card = WindowFrame {
-            x: 900.0,
-            y: 120.0,
-            width: PIN_LEGACY_WIDTH,
-            height: 300.0,
-        };
-        let resolved = resolve_pin_frame(Some(&card));
-        assert_eq!(resolved.x, 900.0);
-        assert_eq!(resolved.width, PIN_WIDTH);
-        assert!(resolved.height >= 280.0);
+        for legacy in PIN_LEGACY_WIDTHS {
+            let card = WindowFrame {
+                x: 900.0,
+                y: 120.0,
+                width: legacy,
+                height: 300.0,
+            };
+            let resolved = resolve_pin_frame(Some(&card));
+            assert_eq!(resolved.x, 900.0);
+            assert_eq!(resolved.width, PIN_WIDTH);
+            assert_eq!(resolved.height, 300.0);
+        }
     }
 
     #[test]
@@ -365,7 +370,7 @@ mod tests {
     fn default_capsule_is_horizontal_pill() {
         let capsule = default_capsule_frame();
         assert!(capsule.width >= 220.0);
-        assert!(capsule.height <= 60.0);
+        assert!(capsule.height <= 68.0);
         assert!(capsule.width > capsule.height);
         validate_frame("capsule", &capsule, CAPSULE_MIN_WIDTH, CAPSULE_MIN_HEIGHT)
             .expect("capsule ok");

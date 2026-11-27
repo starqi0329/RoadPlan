@@ -1,9 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { PointerEvent as ReactPointerEvent } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { listen } from "@tauri-apps/api/event";
 import type { PlanStatus } from "../../bindings";
-import { hidePin, showCapsule, showMain } from "../../api/window";
+import { fitPinHeight, hidePin, showCapsule, showMain } from "../../api/window";
 import { useActiveNow } from "../../hooks/useActiveNow";
 import { formatMinute } from "../../lib/format";
 import { noteDragEnd, noteDragStart, usePersistSecondaryOrigin } from "../../lib/windowDrag";
@@ -27,6 +27,7 @@ function rowClass(status: PlanStatus): string {
 export function PinWindow({ onCloseDemo }: Props) {
   const { now, plans, activePlan } = useActiveNow();
   const [mini, setMini] = useState(false);
+  const shellRef = useRef<HTMLDivElement>(null);
   usePersistSecondaryOrigin("pin");
 
   // 最小化不是另开一个窗，是这张卡自己缩成迷你条：同一个 WebView，按窗口高度切形态。
@@ -51,6 +52,23 @@ export function PinWindow({ onCloseDemo }: Props) {
       void stop.then((fn) => fn());
     };
   }, []);
+
+  // 卡片高度跟着内容走：几行计划就多高，不留一大片空白。
+  useEffect(() => {
+    if (mini) return;
+    const el = shellRef.current;
+    if (!el) return;
+    const head = el.querySelector<HTMLElement>('[data-pin-head="true"]');
+    const body = el.querySelector<HTMLElement>('[data-pin-body="true"]');
+    if (!head || !body) return;
+    const contentHeight = Array.from(body.children).reduce(
+      (sum, child) => sum + (child as HTMLElement).offsetHeight,
+      0,
+    );
+    // body 上下内边距 12×2，头部自带下边框 1px。
+    const total = Math.ceil(head.offsetHeight + contentHeight + 24 + 1);
+    void fitPinHeight(total);
+  }, [mini, plans.length, activePlan?.id]);
 
   function onHeadDown(event: ReactPointerEvent<HTMLDivElement>) {
     if (event.button !== 0) return;
@@ -88,8 +106,13 @@ export function PinWindow({ onCloseDemo }: Props) {
     : `暂无进行中计划${now ? ` · ${formatMinute(now.minute)}` : ""}`;
 
   return (
-    <div className={styles.shell} data-pin-bar="true">
-      <div className={styles.head} onPointerDown={onHeadDown} onPointerUp={noteDragEnd}>
+    <div className={styles.shell} data-pin-bar="true" ref={shellRef}>
+      <div
+        className={styles.head}
+        data-pin-head="true"
+        onPointerDown={onHeadDown}
+        onPointerUp={noteDragEnd}
+      >
         <span className={styles.badge} aria-hidden>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9">
             <path d="M12 17v5" />
@@ -138,7 +161,7 @@ export function PinWindow({ onCloseDemo }: Props) {
         </button>
       </div>
 
-      <div className={styles.body}>
+      <div className={styles.body} data-pin-body="true">
         {plans.length === 0 ? (
           <div className={styles.empty}>今天还没有计划</div>
         ) : (

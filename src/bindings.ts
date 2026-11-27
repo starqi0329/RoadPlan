@@ -328,6 +328,14 @@ async hideCapsule() : Promise<Result<null, AppError>> {
     else return { status: "error", error: e  as any };
 }
 },
+async fitPinHeight(height: number) : Promise<Result<null, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("fit_pin_height", { height }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async setDragging(dragging: boolean) : Promise<Result<null, AppError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("set_dragging", { dragging }) };

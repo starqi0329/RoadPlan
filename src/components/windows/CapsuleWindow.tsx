@@ -50,12 +50,7 @@ export function CapsuleWindow({ onOpenDemo }: Props) {
           void restorePin();
         }}
       >
-        <span className={styles.pin} aria-hidden>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9">
-            <path d="M12 17v5" />
-            <path d="M9 3h6l-1 5 3 3H7l3-3-1-5z" />
-          </svg>
-        </span>
+        <span className={activePlan ? styles.dot : `${styles.dot} ${styles.dotIdle}`} aria-hidden />
         <span className={styles.text}>
           <span className={styles.line}>
             {activePlan ? `正在执行：${activePlan.title}` : "当前没有执行中的计划"}

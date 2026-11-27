@@ -5,56 +5,52 @@
   padding: 0;
 }
 
-/* 原型 .pin-mini：白毛玻璃药丸，22px 圆角，11px 字 */
+/* 置顶卡收起来的迷你条：白药丸，外轮廓由窗口区域裁成 */
 .mini {
   box-sizing: border-box;
   width: 100%;
   height: 100%;
   margin: 0;
-  border: 1px solid rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(0, 0, 0, 0.07);
   border-radius: 22px;
-  background: rgba(255, 255, 255, 0.93);
-  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.17);
+  background: #ffffff;
   color: #6e6e73;
   display: flex;
   align-items: center;
-  justify-content: flex-start;
-  gap: 8px;
-  padding: 8px 13px;
+  gap: 10px;
+  padding: 0 14px;
   cursor: pointer;
   user-select: none;
   app-region: no-drag;
   -webkit-app-region: no-drag;
   font-family: "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
-  font-size: 11px;
+  font-size: 12px;
   transition:
     border-color 0.18s,
-    color 0.18s;
+    background 0.18s;
 }
 
 .mini:hover {
-  border-color: #0a84ff;
-  color: #0a84ff;
+  border-color: rgba(10, 132, 255, 0.45);
 }
 
 .mini:active {
   cursor: grabbing;
 }
 
-.pin {
-  width: 18px;
-  height: 18px;
-  border-radius: 5px;
+/* 蓝色活点：表示这一条正在跑 */
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
   background: #0a84ff;
-  color: #fff;
-  display: grid;
-  place-items: center;
+  box-shadow: 0 0 0 3px rgba(10, 132, 255, 0.14);
   flex-shrink: 0;
 }
 
-.pin svg {
-  width: 10px;
-  height: 10px;
+.dotIdle {
+  background: #c7c7cc;
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.05);
 }
 
 .text {
@@ -66,18 +62,27 @@
 }
 
 .line {
-  font-weight: 500;
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: 0.01em;
   color: #1d1d1f;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  line-height: 1.25;
 }
 
 .sub {
-  font-size: 9px;
+  font-size: 10px;
+  font-weight: 400;
   color: #98989d;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+
+.mini:hover .line {
+  color: #0a84ff;
 }

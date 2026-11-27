@@ -480,6 +480,12 @@ pub fn hide_capsule(app: AppHandle, state: State<'_, WindowUiState>) -> Result<(
 
 #[tauri::command]
 #[specta::specta]
+pub fn fit_pin_height(app: AppHandle, height: f64) -> Result<(), AppError> {
+    window_ops::fit_pin_height(&app, height)
+}
+
+#[tauri::command]
+#[specta::specta]
 pub fn set_dragging(
     app: AppHandle,
     state: State<'_, WindowUiState>,
@@ -538,6 +544,7 @@ pub fn builder() -> Builder<tauri::Wry> {
             hide_pin,
             show_capsule,
             hide_capsule,
+            fit_pin_height,
             set_dragging,
             quit_app,
         ])

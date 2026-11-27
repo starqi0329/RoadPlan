@@ -168,7 +168,8 @@ pub fn show_pin(app: &AppHandle, state: &WindowUiState) -> Result<(), AppError> 
     present_secondary(&win, "置顶")?;
     // 从迷你条点出来也一定回到整张卡。
     let _ = app.emit("pin-mini-mode", MiniMode { mini: false });
-    finish_pin_surface(&win, &frame, CARD_CORNER_RADIUS);
+    finish_pin_surface(&win, &frame);
+    // 冷启动这里先不裁区：窗口刚建出来就 SetWindowRgn，WebView2 会一直不首帧（整窗白）。
     update_visibility(app, state, |layout| layout.pin_visible = true)
 }
 
@@ -201,7 +202,8 @@ pub fn show_capsule(app: &AppHandle, state: &WindowUiState) -> Result<(), AppErr
     let _ = win.set_always_on_top(true);
     present_secondary(&win, "迷你条")?;
     // 迷你条外轮廓也是胶囊：把窗口本身按药丸裁出来，不然里面圆、外面还是直角。
-    finish_pin_surface(&win, &mini, mini.height / 2.0);
+    finish_pin_surface(&win, &mini);
+    set_pin_clip(&win, mini.height / 2.0);
     app.emit("pin-mini-mode", MiniMode { mini: true })
         .map_err(|error| AppError::Internal {
             message: format!("切换迷你条失败: {error}"),
@@ -227,13 +229,39 @@ pub fn hide_capsule(app: &AppHandle, state: &WindowUiState) -> Result<(), AppErr
         apply_frame(&win, &frame)?;
         let _ = win.set_always_on_top(true);
         let _ = win.show();
-        finish_pin_surface(&win, &frame, CARD_CORNER_RADIUS);
+        finish_pin_surface(&win, &frame);
+        set_pin_clip(&win, 14.0);
     }
     let _ = app.emit("pin-mini-mode", MiniMode { mini: false });
     update_visibility(app, state, |layout| {
         layout.pin_visible = true;
         layout.capsule_visible = false;
     })
+}
+
+/// 卡片高度按内容自适应：前端量好需要多高就报上来，宽度和位置不动。
+pub fn fit_pin_height(app: &AppHandle, height: f64) -> Result<(), AppError> {
+    if !height.is_finite() {
+        return Ok(());
+    }
+    let Some(win) = app.get_webview_window(PIN_LABEL) else {
+        return Ok(());
+    };
+    let fallback = window_layout::default_pin_frame();
+    let current = current_frame(&win, &fallback);
+    // 迷你条状态下别把胶囊撑成卡片。
+    if current.height < 100.0 {
+        return Ok(());
+    }
+    let target = height.clamp(window_layout::PIN_MIN_HEIGHT, 420.0);
+    if (target - current.height).abs() < 1.0 {
+        return Ok(());
+    }
+    win.set_size(LogicalSize::new(current.width, target))
+        .map_err(|error| AppError::Internal {
+            message: format!("设置置顶卡高度失败: {error}"),
+        })?;
+    Ok(())
 }
 
 pub fn set_dragging(
@@ -336,7 +364,8 @@ fn ensure_secondary_window(
         .focused(false)
         .decorations(false)
         .maximizable(false)
-        // 圆角露出的底就是窗底色：置顶卡片和迷你条都是白底，边角才不脏。
+        // 白底不透明窗：transparent 在 WebView2 冷启动会整窗空白（实证过），
+        // 所以底色固定不透明白，外形交给窗口区域裁（见 set_pin_clip）。
         .background_color(Color(255, 255, 255, 255))
         .initialization_script(secondary_boot_script(label))
         .on_page_load(|window, payload| {
@@ -467,10 +496,7 @@ fn pin_on_screen(window: &tauri::WebviewWindow, frame: &WindowFrame) -> (f64, f6
     (x, y)
 }
 
-/// 卡片外轮廓圆角（和 CSS 的 14px 对齐）。
-const CARD_CORNER_RADIUS: f64 = 14.0;
-
-fn finish_pin_surface(window: &tauri::WebviewWindow, frame: &WindowFrame, corner_radius: f64) {
+fn finish_pin_surface(window: &tauri::WebviewWindow, frame: &WindowFrame) {
     #[cfg(windows)]
     if let (Ok(hwnd), Ok(scale)) = (native_hwnd(window), window.scale_factor()) {
         let x = (frame.x * scale).round() as i32;
@@ -482,25 +508,34 @@ fn finish_pin_surface(window: &tauri::WebviewWindow, frame: &WindowFrame, corner
             SetWindowPos(hwnd, HWND_TOPMOST, x, y, width, height, SWP_SHOWWINDOW);
             let _ = SetForegroundWindow(hwnd);
         }
-        apply_rounded_region(hwnd, width, height, corner_radius * scale);
     }
     let _ = window.eval(pin_fallback_script());
 }
 
-/// 用窗口区域把外轮廓裁成圆角/药丸，顺带去掉无边框窗口的直角边。
-#[cfg(windows)]
-fn apply_rounded_region(hwnd: *mut std::ffi::c_void, width: i32, height: i32, radius: f64) {
-    let diameter = (radius * 2.0).round().max(1.0) as i32;
-    unsafe {
-        let rgn = CreateRoundRectRgn(0, 0, width + 1, height + 1, diameter, diameter);
-        if rgn.is_null() {
-            return;
-        }
-        // 成功后区域归系统所有，不能再 DeleteObject；失败则自己回收。
-        if SetWindowRgn(hwnd, rgn, 1) == 0 {
-            let _ = DeleteObject(rgn);
+/// 用窗口区域把窗口外形裁成圆角：卡片给 14px，迷你条给高度一半（药丸）。
+/// 按真实外框裁，逻辑尺寸会差一个边框宽度，裁出来会有硬边。
+fn set_pin_clip(window: &tauri::WebviewWindow, radius: f64) {
+    #[cfg(windows)]
+    if let Ok(hwnd) = native_hwnd(window) {
+        let scale = window.scale_factor().unwrap_or(1.0);
+        let (width, height) = match window.outer_size() {
+            Ok(size) => (size.width.max(1) as i32, size.height.max(1) as i32),
+            Err(_) => return,
+        };
+        let round = (radius * scale).round().max(0.0) as i32;
+        unsafe {
+            let rgn = CreateRoundRectRgn(0, 0, width + 1, height + 1, round * 2, round * 2);
+            if rgn.is_null() {
+                return;
+            }
+            // 成功后区域归系统所有，不能再 DeleteObject；失败才自己回收。
+            if SetWindowRgn(hwnd, rgn, 1) == 0 {
+                let _ = DeleteObject(rgn);
+            }
         }
     }
+    #[cfg(not(windows))]
+    let _ = (window, radius);
 }
 
 fn present_secondary(window: &tauri::WebviewWindow, name: &str) -> Result<(), AppError> {

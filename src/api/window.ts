@@ -158,6 +158,16 @@ export async function hideCapsule(): Promise<void> {
   );
 }
 
+/** 置顶卡按内容自适应高度：只改高度，宽度和位置不动。 */
+export async function fitPinHeight(height: number): Promise<void> {
+  await withWindowFallback(
+    async () => {
+      unwrapResult(await commands.fitPinHeight(height));
+    },
+    async () => {},
+  );
+}
+
 export async function setDragging(dragging: boolean): Promise<void> {
   await withWindowFallback(
     async () => {
