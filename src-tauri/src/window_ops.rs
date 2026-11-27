@@ -168,7 +168,7 @@ pub fn show_pin(app: &AppHandle, state: &WindowUiState) -> Result<(), AppError> 
     present_secondary(&win, "置顶")?;
     // 从迷你条点出来也一定回到整张卡。
     let _ = app.emit("pin-mini-mode", MiniMode { mini: false });
-    finish_pin_surface(&win, &frame);
+    finish_pin_surface(&win, &frame, CARD_CORNER_RADIUS);
     update_visibility(app, state, |layout| layout.pin_visible = true)
 }
 
@@ -200,6 +200,8 @@ pub fn show_capsule(app: &AppHandle, state: &WindowUiState) -> Result<(), AppErr
     let _ = win.unminimize();
     let _ = win.set_always_on_top(true);
     present_secondary(&win, "迷你条")?;
+    // 迷你条外轮廓也是胶囊：把窗口本身按药丸裁出来，不然里面圆、外面还是直角。
+    finish_pin_surface(&win, &mini, mini.height / 2.0);
     app.emit("pin-mini-mode", MiniMode { mini: true })
         .map_err(|error| AppError::Internal {
             message: format!("切换迷你条失败: {error}"),
@@ -225,6 +227,7 @@ pub fn hide_capsule(app: &AppHandle, state: &WindowUiState) -> Result<(), AppErr
         apply_frame(&win, &frame)?;
         let _ = win.set_always_on_top(true);
         let _ = win.show();
+        finish_pin_surface(&win, &frame, CARD_CORNER_RADIUS);
     }
     let _ = app.emit("pin-mini-mode", MiniMode { mini: false });
     update_visibility(app, state, |layout| {
@@ -464,7 +467,10 @@ fn pin_on_screen(window: &tauri::WebviewWindow, frame: &WindowFrame) -> (f64, f6
     (x, y)
 }
 
-fn finish_pin_surface(window: &tauri::WebviewWindow, frame: &WindowFrame) {
+/// 卡片外轮廓圆角（和 CSS 的 14px 对齐）。
+const CARD_CORNER_RADIUS: f64 = 14.0;
+
+fn finish_pin_surface(window: &tauri::WebviewWindow, frame: &WindowFrame, corner_radius: f64) {
     #[cfg(windows)]
     if let (Ok(hwnd), Ok(scale)) = (native_hwnd(window), window.scale_factor()) {
         let x = (frame.x * scale).round() as i32;
@@ -476,8 +482,25 @@ fn finish_pin_surface(window: &tauri::WebviewWindow, frame: &WindowFrame) {
             SetWindowPos(hwnd, HWND_TOPMOST, x, y, width, height, SWP_SHOWWINDOW);
             let _ = SetForegroundWindow(hwnd);
         }
+        apply_rounded_region(hwnd, width, height, corner_radius * scale);
     }
     let _ = window.eval(pin_fallback_script());
+}
+
+/// 用窗口区域把外轮廓裁成圆角/药丸，顺带去掉无边框窗口的直角边。
+#[cfg(windows)]
+fn apply_rounded_region(hwnd: *mut std::ffi::c_void, width: i32, height: i32, radius: f64) {
+    let diameter = (radius * 2.0).round().max(1.0) as i32;
+    unsafe {
+        let rgn = CreateRoundRectRgn(0, 0, width + 1, height + 1, diameter, diameter);
+        if rgn.is_null() {
+            return;
+        }
+        // 成功后区域归系统所有，不能再 DeleteObject；失败则自己回收。
+        if SetWindowRgn(hwnd, rgn, 1) == 0 {
+            let _ = DeleteObject(rgn);
+        }
+    }
 }
 
 fn present_secondary(window: &tauri::WebviewWindow, name: &str) -> Result<(), AppError> {
@@ -627,6 +650,16 @@ unsafe extern "system" {
         flags: u32,
     ) -> i32;
     fn SetForegroundWindow(hwnd: *mut std::ffi::c_void) -> i32;
+    fn CreateRoundRectRgn(
+        left: i32,
+        top: i32,
+        right: i32,
+        bottom: i32,
+        width_ellipse: i32,
+        height_ellipse: i32,
+    ) -> *mut std::ffi::c_void;
+    fn SetWindowRgn(hwnd: *mut std::ffi::c_void, rgn: *mut std::ffi::c_void, redraw: i32) -> i32;
+    fn DeleteObject(object: *mut std::ffi::c_void) -> i32;
 }
 
 fn apply_frame(window: &tauri::WebviewWindow, frame: &WindowFrame) -> Result<(), AppError> {

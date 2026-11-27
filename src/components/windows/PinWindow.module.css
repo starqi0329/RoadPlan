@@ -192,22 +192,3 @@
   color: var(--txt-3);
   flex-shrink: 0;
 }
-
-.foot {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 12px;
-  border-top: 1px solid var(--stroke);
-  font-size: 9px;
-  color: var(--txt-3);
-}
-
-.live {
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: var(--green);
-  box-shadow: 0 0 0 3px rgba(52, 199, 89, 0.12);
-  flex-shrink: 0;
-}

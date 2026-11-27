@@ -14,8 +14,12 @@ pub const MAIN_MIN_WIDTH: f64 = 640.0;
 pub const MAIN_MIN_HEIGHT: f64 = 480.0;
 
 /// 置顶窗：一张竖版时刻表卡片，不是横条。
-pub const PIN_MIN_WIDTH: f64 = 280.0;
-pub const PIN_MIN_HEIGHT: f64 = 260.0; // 卡片至少能放下头部 + 两条计划
+pub const PIN_MIN_WIDTH: f64 = 260.0;
+pub const PIN_MIN_HEIGHT: f64 = 240.0; // 卡片至少能放下头部 + 两条计划
+
+/// 旧版卡片默认宽度，存档里等于它的按新默认宽迁一次。
+const PIN_LEGACY_WIDTH: f64 = 320.0;
+const PIN_WIDTH: f64 = 288.0;
 
 pub const CAPSULE_MIN_WIDTH: f64 = 150.0;
 pub const CAPSULE_MIN_HEIGHT: f64 = 36.0;
@@ -27,8 +31,8 @@ pub fn default_pin_frame() -> WindowFrame {
     WindowFrame {
         x: 80.0,
         y: 96.0,
-        width: 320.0,
-        height: 300.0,
+        width: PIN_WIDTH,
+        height: 288.0,
     }
 }
 
@@ -58,12 +62,18 @@ pub fn default_layout() -> WindowLayout {
     }
 }
 
-/// 置顶：旧版横条几何（太矮）→ 换成卡片尺寸，保留坐标；合法卡片保留。
+/// 置顶：旧版横条几何（太矮）→ 换成卡片尺寸，保留坐标；
+/// 旧版默认宽（320）→ 迁到更窄的新默认宽；其余合法卡片保留。
 pub fn resolve_pin_frame(stored: Option<&WindowFrame>) -> WindowFrame {
     let default = default_pin_frame();
     match stored {
         Some(frame) if validate_frame("pin", frame, PIN_MIN_WIDTH, PIN_MIN_HEIGHT).is_ok() => {
-            frame.clone()
+            let mut resolved = frame.clone();
+            if (resolved.width - PIN_LEGACY_WIDTH).abs() < 1.0 {
+                resolved.width = default.width;
+                resolved.height = resolved.height.max(default.height);
+            }
+            resolved
         }
         Some(frame) if coords_ok(frame) => WindowFrame {
             x: frame.x,
@@ -289,9 +299,23 @@ mod tests {
     #[test]
     fn default_pin_is_card_within_usable_range() {
         let pin = default_pin_frame();
-        assert!(pin.width >= 300.0 && pin.width <= 360.0);
+        assert!(pin.width >= 260.0 && pin.width <= 300.0);
         assert!(pin.height >= 280.0 && pin.height <= 400.0);
         validate_frame("pin", &pin, PIN_MIN_WIDTH, PIN_MIN_HEIGHT).expect("pin ok");
+    }
+
+    #[test]
+    fn resolve_pin_migrates_legacy_default_width_to_narrower_card() {
+        let card = WindowFrame {
+            x: 900.0,
+            y: 120.0,
+            width: PIN_LEGACY_WIDTH,
+            height: 300.0,
+        };
+        let resolved = resolve_pin_frame(Some(&card));
+        assert_eq!(resolved.x, 900.0);
+        assert_eq!(resolved.width, PIN_WIDTH);
+        assert!(resolved.height >= 280.0);
     }
 
     #[test]

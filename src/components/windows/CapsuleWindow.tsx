@@ -26,7 +26,7 @@ export function CapsuleWindow({ onOpenDemo }: Props) {
       <button
         type="button"
         className={styles.mini}
-        title="恢复置顶时刻表（拖动可挪位置）"
+        title="展开为今日时刻表"
         onMouseDown={(event) => {
           if (event.button !== 0) return;
           origin.current = { x: event.screenX, y: event.screenY };
@@ -57,14 +57,16 @@ export function CapsuleWindow({ onOpenDemo }: Props) {
           </svg>
         </span>
         <span className={styles.text}>
-          <span className={styles.line}>{activePlan ? activePlan.title : "今日时刻表"}</span>
-          <small className={styles.sub}>
-            {activePlan
-              ? `${formatMinute(activePlan.start)}–${formatMinute(activePlan.end)}${
-                  remain === null ? "" : ` · 剩余 ${remain} 分`
-                }`
-              : "已最小化 · 点击恢复"}
-          </small>
+          <span className={styles.line}>
+            {activePlan ? `正在执行：${activePlan.title}` : "当前没有执行中的计划"}
+          </span>
+          {activePlan ? (
+            <small className={styles.sub}>
+              {`${formatMinute(activePlan.start)}–${formatMinute(activePlan.end)}${
+                remain === null ? "" : ` · 剩余 ${remain} 分`
+              }`}
+            </small>
+          ) : null}
         </span>
       </button>
     </div>

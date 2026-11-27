@@ -152,11 +152,6 @@ export function PinWindow({ onCloseDemo }: Props) {
           ))
         )}
       </div>
-
-      <div className={styles.foot}>
-        <i className={styles.live} aria-hidden />
-        始终显示在桌面最前 · 拖动标题栏可移动
-      </div>
     </div>
   );
 }
