@@ -13,13 +13,35 @@ pub const CAPSULE_LABEL: &str = "capsule";
 pub const MAIN_MIN_WIDTH: f64 = 640.0;
 pub const MAIN_MIN_HEIGHT: f64 = 480.0;
 
-const PIN_MIN_WIDTH: f64 = 160.0;
-const PIN_MIN_HEIGHT: f64 = 120.0;
-const CAPSULE_MIN_WIDTH: f64 = 40.0;
-const CAPSULE_MIN_HEIGHT: f64 = 80.0;
+/// 置顶横条：UI 是扁条，不是竖向大窗。
+pub const PIN_MIN_WIDTH: f64 = 200.0;
+pub const PIN_MIN_HEIGHT: f64 = 72.0;
+/// 高于此视为旧版竖窗几何，创建/显示时改用默认横条尺寸（保留坐标）。
+pub const PIN_BAR_MAX_HEIGHT: f64 = 120.0;
+
+pub const CAPSULE_MIN_WIDTH: f64 = 40.0;
+pub const CAPSULE_MIN_HEIGHT: f64 = 80.0;
 
 /// 明显屏外：真机曾出现约 -16000；超出此范围视为废坐标。
 const COORD_ABS_LIMIT: f64 = 10_000.0;
+
+pub fn default_pin_frame() -> WindowFrame {
+    WindowFrame {
+        x: 80.0,
+        y: 48.0,
+        width: 320.0,
+        height: 96.0,
+    }
+}
+
+pub fn default_capsule_frame() -> WindowFrame {
+    WindowFrame {
+        x: 8.0,
+        y: 240.0,
+        width: 56.0,
+        height: 160.0,
+    }
+}
 
 pub fn default_layout() -> WindowLayout {
     WindowLayout {
@@ -29,22 +51,52 @@ pub fn default_layout() -> WindowLayout {
             width: 1100.0,
             height: 760.0,
         },
-        pin: Some(WindowFrame {
-            x: 80.0,
-            y: 120.0,
-            width: 320.0,
-            height: 480.0,
-        }),
-        capsule: Some(WindowFrame {
-            x: 0.0,
-            y: 240.0,
-            width: 56.0,
-            height: 160.0,
-        }),
+        pin: Some(default_pin_frame()),
+        capsule: Some(default_capsule_frame()),
         main_collapsed: false,
         pin_visible: false,
         capsule_visible: false,
     }
+}
+
+/// 置顶：非法或旧竖窗（过高）→ 默认横条；合法横条保留。
+pub fn resolve_pin_frame(stored: Option<&WindowFrame>) -> WindowFrame {
+    let default = default_pin_frame();
+    match stored {
+        Some(frame)
+            if validate_frame("pin", frame, PIN_MIN_WIDTH, PIN_MIN_HEIGHT).is_ok()
+                && frame.height <= PIN_BAR_MAX_HEIGHT =>
+        {
+            frame.clone()
+        }
+        Some(frame) if coords_ok(frame) => WindowFrame {
+            x: frame.x,
+            y: frame.y,
+            width: default.width,
+            height: default.height,
+        },
+        _ => default,
+    }
+}
+
+/// 胶囊：非法 → 默认窄竖条。
+pub fn resolve_capsule_frame(stored: Option<&WindowFrame>) -> WindowFrame {
+    let default = default_capsule_frame();
+    match stored {
+        Some(frame)
+            if validate_frame("capsule", frame, CAPSULE_MIN_WIDTH, CAPSULE_MIN_HEIGHT).is_ok() =>
+        {
+            frame.clone()
+        }
+        _ => default,
+    }
+}
+
+fn coords_ok(frame: &WindowFrame) -> bool {
+    frame.x.is_finite()
+        && frame.y.is_finite()
+        && frame.x.abs() <= COORD_ABS_LIMIT
+        && frame.y.abs() <= COORD_ABS_LIMIT
 }
 
 pub fn layout_path(app: &AppHandle) -> Result<PathBuf, AppError> {
@@ -230,5 +282,50 @@ mod tests {
         assert_eq!(back.main.width, layout.main.width);
         assert_eq!(back.main_collapsed, layout.main_collapsed);
         assert!(!back.pin_visible);
+    }
+
+    #[test]
+    fn default_pin_is_horizontal_bar_within_usable_range() {
+        let pin = default_pin_frame();
+        assert!(pin.width >= 280.0 && pin.width <= 360.0);
+        assert!(pin.height >= 72.0 && pin.height <= 120.0);
+        validate_frame("pin", &pin, PIN_MIN_WIDTH, PIN_MIN_HEIGHT).expect("pin ok");
+    }
+
+    #[test]
+    fn resolve_pin_replaces_legacy_tall_geometry_keeps_origin() {
+        let tall = WindowFrame {
+            x: 100.0,
+            y: 200.0,
+            width: 320.0,
+            height: 480.0,
+        };
+        let resolved = resolve_pin_frame(Some(&tall));
+        assert_eq!(resolved.x, 100.0);
+        assert_eq!(resolved.y, 200.0);
+        assert_eq!(resolved.height, default_pin_frame().height);
+        assert!(resolved.height <= PIN_BAR_MAX_HEIGHT);
+    }
+
+    #[test]
+    fn resolve_pin_keeps_valid_bar() {
+        let bar = WindowFrame {
+            x: 40.0,
+            y: 60.0,
+            width: 300.0,
+            height: 88.0,
+        };
+        let resolved = resolve_pin_frame(Some(&bar));
+        assert_eq!(resolved.width, 300.0);
+        assert_eq!(resolved.height, 88.0);
+    }
+
+    #[test]
+    fn default_capsule_is_narrow_strip() {
+        let capsule = default_capsule_frame();
+        assert!(capsule.width <= 80.0);
+        assert!(capsule.height >= CAPSULE_MIN_HEIGHT);
+        validate_frame("capsule", &capsule, CAPSULE_MIN_WIDTH, CAPSULE_MIN_HEIGHT)
+            .expect("capsule ok");
     }
 }
