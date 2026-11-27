@@ -209,12 +209,39 @@
   border-bottom: 1px solid var(--stroke);
   background: linear-gradient(90deg, rgba(0, 122, 255, 0.05), transparent 45%);
   flex-shrink: 0;
-  cursor: grab;
+  cursor: default;
   user-select: none;
 }
 
-.titlebar:active {
+.dragStrip {
+  flex: 1;
+  min-width: 0;
+  /* 写死顶栏高度。height:100% 时 WebView2 会把拖动区算成整窗，右边的按钮就点不中。 */
+  height: 60px;
+  max-height: 60px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  cursor: grab;
+  overflow: hidden;
+  app-region: drag;
+  -webkit-app-region: drag;
+}
+
+.dragStrip,
+.dragStrip * {
+  app-region: drag;
+  -webkit-app-region: drag;
+}
+
+.dragStrip:active {
   cursor: grabbing;
+}
+
+.winbtns,
+.winbtns * {
+  app-region: no-drag;
+  -webkit-app-region: no-drag;
 }
 
 .brand {
@@ -299,6 +326,11 @@
   display: flex;
   gap: 6px;
   margin-left: 14px;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 3;
+  height: 60px;
+  align-items: center;
 }
 
 .wbtn {
@@ -315,6 +347,8 @@
   font-size: 12px;
   line-height: 1;
   white-space: nowrap;
+  app-region: no-drag;
+  -webkit-app-region: no-drag;
 }
 
 .wbtn:hover {
@@ -391,20 +425,20 @@
 
 .demoPin {
   position: fixed;
-  left: 28px;
-  top: 28px;
+  right: 26px;
+  top: 96px;
   z-index: 40;
   width: 320px;
-  height: 88px;
+  height: 300px;
 }
 
 .demoCapsule {
   position: fixed;
-  right: 12px;
-  top: 30%;
+  right: 26px;
+  top: 120px;
   z-index: 40;
-  width: 56px;
-  height: 180px;
+  width: 236px;
+  height: 44px;
 }
 
 @media (max-width: 860px) {

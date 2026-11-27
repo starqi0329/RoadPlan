@@ -1,6 +1,6 @@
 import { isTauri } from "@tauri-apps/api/core";
 import { useQuery } from "@tanstack/react-query";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type PointerEvent } from "react";
 import { listGoals } from "../../api/goals";
 import { isAppError } from "../../api/result";
 import {
@@ -9,7 +9,6 @@ import {
   getWindowLayout,
   minimizeMain,
   saveWindowLayout,
-  setDragging,
   setMainCollapsed,
   showCapsule,
   showPin,
@@ -22,6 +21,7 @@ import { isUnimplemented, translateAppError } from "../../errors/appError";
 import { useActiveNow } from "../../hooks/useActiveNow";
 import { datePeriodLabel } from "../../lib/dateLabels";
 import { formatDateHeading } from "../../lib/format";
+import { noteDragEnd, noteDragStart } from "../../lib/windowDrag";
 import { isCollapsedSized, isSaneExpandedFrame, TITLEBAR_HEIGHT } from "../../lib/windowFrame";
 import { DayView } from "../DayView";
 import { GoalTree } from "../GoalTree";
@@ -31,6 +31,14 @@ import { AuditDrawer } from "./AuditDrawer";
 import styles from "./AppShell.module.css";
 import { LeftRail, type RailView } from "./LeftRail";
 import { StatusBar } from "./StatusBar";
+
+/** 按下就执行。等 click 的话，拖动区会把这一下吃掉，关闭和置顶就像没点到。 */
+function pressWindowButton(event: PointerEvent, run: () => void) {
+  if (event.button !== 0) return;
+  event.preventDefault();
+  event.stopPropagation();
+  run();
+}
 
 const DEFAULT_EXPANDED: WindowFrame = {
   x: 120,
@@ -170,6 +178,36 @@ export function AppShell() {
 
   // 系统关闭进托盘：只由 Rust CloseRequested → hide_main_to_tray 处理，
   // 前端不再挂 onCloseRequested，避免与后端双重 hide。
+
+  useEffect(() => {
+    if (!native) return;
+    const refreshDragRegions = () => {
+      const root = document.documentElement;
+      root.dataset.regionRefresh = "1";
+      window.requestAnimationFrame(() => {
+        delete root.dataset.regionRefresh;
+      });
+    };
+    refreshDragRegions();
+    let unlisten: (() => void) | undefined;
+    let disposed = false;
+    void (async () => {
+      try {
+        const { getCurrentWindow } = await import("@tauri-apps/api/window");
+        const stop = await getCurrentWindow().onFocusChanged(({ payload: focused }) => {
+          if (focused) refreshDragRegions();
+        });
+        if (disposed) stop();
+        else unlisten = stop;
+      } catch {
+        // 浏览器演示没有系统窗
+      }
+    })();
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
+  }, [native]);
 
   useEffect(() => {
     if (!native) return;
@@ -319,26 +357,16 @@ export function AppShell() {
     window.setTimeout(() => setHighlightPlanId(null), 1800);
   }
 
-  async function beginDrag() {
-    setDraggingUi(true);
-    try {
-      await setDragging(true);
-      if (native) {
-        const { getCurrentWindow } = await import("@tauri-apps/api/window");
-        await getCurrentWindow().startDragging();
-      }
-    } catch {
-      // ignore
-    }
+  function beginDrag(event: React.PointerEvent) {
+    if (event.button !== 0) return;
+    if ((event.target as HTMLElement).closest("button")) return;
+    window.setTimeout(() => setDraggingUi(true), 0);
+    noteDragStart();
   }
 
-  async function endDrag() {
+  function endDrag() {
     setDraggingUi(false);
-    try {
-      await setDragging(false);
-    } catch {
-      // ignore
-    }
+    noteDragEnd();
   }
 
   const mainMinimized = !native && mockUi.minimized;
@@ -423,39 +451,32 @@ export function AppShell() {
           role="application"
           aria-label="时序"
         >
-          <header
-            className={styles.titlebar}
-            onPointerDown={(event) => {
-              if ((event.target as HTMLElement).closest("button")) return;
-              void beginDrag();
-            }}
-            onPointerUp={() => {
-              void endDrag();
-            }}
-          >
-            <div className={styles.brand}>
-              <div className={styles.logo} aria-hidden>
-                <svg viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2">
-                  <path d="M4 7h16M4 12h16M4 17h10" />
-                </svg>
+          <header className={styles.titlebar}>
+            <div className={styles.dragStrip} onPointerDown={beginDrag} onPointerUp={endDrag}>
+              <div className={styles.brand}>
+                <div className={styles.logo} aria-hidden>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2">
+                    <path d="M4 7h16M4 12h16M4 17h10" />
+                  </svg>
+                </div>
+                时序
               </div>
-              时序
+              <div className={styles.datebox}>
+                <span className={styles.dateMain}>{dateMain}</span>
+                <span className={styles.dateSub}>{dateSub}</span>
+              </div>
+              <div className={styles.nowtag}>
+                <span className={styles.pulse} aria-hidden />
+                {activePlan ? (
+                  <>
+                    正在执行 <b>{activePlan.title}</b>
+                  </>
+                ) : (
+                  <span>当前没有进行中的计划</span>
+                )}
+              </div>
             </div>
-            <div className={styles.datebox}>
-              <span className={styles.dateMain}>{dateMain}</span>
-              <span className={styles.dateSub}>{dateSub}</span>
-            </div>
-            <div className={styles.nowtag}>
-              <span className={styles.pulse} aria-hidden />
-              {activePlan ? (
-                <>
-                  正在执行 <b>{activePlan.title}</b>
-                </>
-              ) : (
-                <span>当前没有进行中的计划</span>
-              )}
-            </div>
-            <div className={styles.winbtns}>
+            <div className={styles.winbtns} data-window-controls="true">
               <button
                 type="button"
                 className={`${styles.wbtn} ${auditOpen ? styles.wbtnOn : ""}`}
@@ -471,25 +492,25 @@ export function AppShell() {
                 className={styles.wbtn}
                 title="最小化"
                 aria-label="最小化"
-                onClick={() => void minimizeWindow()}
+                onPointerDown={(event) => pressWindowButton(event, () => void minimizeWindow())}
               >
                 最小化
               </button>
               <button
                 type="button"
                 className={styles.wbtn}
-                title="隐藏到边缘胶囊"
-                aria-label="隐藏到边缘胶囊"
-                onClick={() => void hideToCapsule()}
+                title="收进托盘，桌面只留当前计划迷你条"
+                aria-label="收进托盘，桌面只留当前计划迷你条"
+                onPointerDown={(event) => pressWindowButton(event, () => void hideToCapsule())}
               >
-                胶囊
+                迷你条
               </button>
               <button
                 type="button"
                 className={styles.wbtn}
                 title="打开置顶小窗"
                 aria-label="打开置顶小窗"
-                onClick={() => void openPin()}
+                onPointerDown={(event) => pressWindowButton(event, () => void openPin())}
               >
                 置顶
               </button>
@@ -498,7 +519,7 @@ export function AppShell() {
                 className={styles.wbtn}
                 title="关闭到托盘"
                 aria-label="关闭到托盘"
-                onClick={() => void closeToTray()}
+                onPointerDown={(event) => pressWindowButton(event, () => void closeToTray())}
               >
                 ×
               </button>

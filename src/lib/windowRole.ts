@@ -35,10 +35,17 @@ export function roleFromTauriLabelSync(): WindowRole | null {
   }
 }
 
-/** 当前前端落在哪个系统窗：优先 query，其次同步 label。 */
+/** 后端创建副窗时在页面脚本前写入，不依赖会打不开的 ?window= 地址。 */
+export function roleFromBootGlobal(): WindowRole | null {
+  if (typeof window === "undefined") return null;
+  const marked = (window as Window & { __ROADPLAN_ROLE__?: string }).__ROADPLAN_ROLE__;
+  return roleFromString(marked);
+}
+
+/** 当前前端落在哪个系统窗：启动标记、query，其次同步 label。 */
 export function resolveWindowRole(): WindowRole {
   if (typeof window === "undefined") return "main";
-  return roleFromQuery() ?? roleFromTauriLabelSync() ?? "main";
+  return roleFromBootGlobal() ?? roleFromQuery() ?? roleFromTauriLabelSync() ?? "main";
 }
 
 /**
@@ -48,12 +55,16 @@ export function resolveWindowRole(): WindowRole {
 export function shouldDeferMainShell(): boolean {
   if (typeof window === "undefined") return false;
   if (!isTauri()) return false;
+  if (roleFromBootGlobal() !== null) return false;
   if (roleFromQuery() !== null) return false;
   if (roleFromTauriLabelSync() !== null) return false;
   return true;
 }
 
 export async function resolveWindowRoleAsync(): Promise<WindowRole> {
+  const fromBoot = roleFromBootGlobal();
+  if (fromBoot) return fromBoot;
+
   const fromQuery = roleFromQuery();
   if (fromQuery) return fromQuery;
 

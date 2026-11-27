@@ -54,7 +54,7 @@ html[data-shell="native"][data-collapsed="true"] #root {
   background: transparent;
 }
 
-/* 置顶 / 胶囊副窗：铺满系统窗，不要主壳桌面垫色 */
+/* 置顶 / 胶囊副窗：按窗口自己的尺寸铺满。不能用主窗的 320px 最小宽度，否则 56px 胶囊只剩一条空白。 */
 html[data-window-role="pin"],
 html[data-window-role="pin"] body,
 html[data-window-role="pin"] #root,
@@ -62,16 +62,24 @@ html[data-window-role="capsule"],
 html[data-window-role="capsule"] body,
 html[data-window-role="capsule"] #root {
   height: 100%;
-  min-height: 100%;
+  min-height: 0;
+  min-width: 0;
   margin: 0;
-  background: transparent;
-  overflow: hidden;
+  background: #ffffff;
+  overflow: visible;
 }
 
 button,
 input,
 select {
   font: inherit;
+}
+
+/* 最小化再恢复后，WebView2 会把右边按钮重新算进拖动区。只重算按钮，不动左边的拖动条。 */
+html[data-region-refresh] [data-window-controls],
+html[data-region-refresh] [data-window-controls] * {
+  app-region: no-drag !important;
+  -webkit-app-region: no-drag !important;
 }
 
 #root {

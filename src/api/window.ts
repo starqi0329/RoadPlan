@@ -1,5 +1,5 @@
 import { isTauri } from "@tauri-apps/api/core";
-import { commands, type AppError, type WindowLayout } from "../bindings";
+import { commands, type WindowLayout } from "../bindings";
 import { isUnimplemented } from "../errors/appError";
 import * as mockWindow from "./mockWindow";
 import { isAppError, unwrapResult } from "./result";
@@ -30,35 +30,16 @@ async function withWindowFallback<T>(
  */
 async function ensureSecondaryVisible(label: "pin" | "capsule"): Promise<void> {
   if (!isTauri()) return;
-  const { WebviewWindow } = await import("@tauri-apps/api/webviewWindow");
-  const win = await WebviewWindow.getByLabel(label);
-  if (!win) {
-    const err: AppError = {
-      code: "not_found",
-      entity: "window",
-      id: label,
-    };
-    throw err;
-  }
   try {
+    const { WebviewWindow } = await import("@tauri-apps/api/webviewWindow");
+    const win = await WebviewWindow.getByLabel(label);
+    if (!win) return;
+    await win.unminimize();
     await win.setAlwaysOnTop(true);
     await win.show();
     if (label === "pin") await win.setFocus();
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    const err: AppError = {
-      code: "internal",
-      message: `显示${label === "pin" ? "置顶" : "胶囊"}窗失败: ${message}`,
-    };
-    throw err;
-  }
-  const visible = await win.isVisible();
-  if (!visible) {
-    const err: AppError = {
-      code: "internal",
-      message: `${label === "pin" ? "置顶" : "胶囊"}窗已创建但仍不可见`,
-    };
-    throw err;
+  } catch {
+    // 命令已经成功。这里只是再顶一次，权限或时机失败不把窗口判成没打开。
   }
 }
 

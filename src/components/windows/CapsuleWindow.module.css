@@ -1,55 +1,83 @@
-.capsule {
+.shell {
   box-sizing: border-box;
   width: 100%;
   height: 100%;
-  min-height: 100%;
+  padding: 0;
+}
+
+/* 原型 .pin-mini：白毛玻璃药丸，22px 圆角，11px 字 */
+.mini {
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
   margin: 0;
-  border: 1px solid rgba(255, 255, 255, 0.65);
-  border-radius: 18px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(240, 244, 255, 0.88));
-  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.93);
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.17);
+  color: #6e6e73;
   display: flex;
-  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: 10px;
-  padding: 14px 8px;
+  justify-content: flex-start;
+  gap: 8px;
+  padding: 8px 13px;
   cursor: pointer;
-  color: var(--txt);
-  font: inherit;
+  user-select: none;
+  app-region: no-drag;
+  -webkit-app-region: no-drag;
+  font-family: "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
+  font-size: 11px;
+  transition:
+    border-color 0.18s,
+    color 0.18s;
 }
 
-.capsule:hover {
-  border-color: rgba(0, 122, 255, 0.35);
+.mini:hover {
+  border-color: #0a84ff;
+  color: #0a84ff;
 }
 
-.dot {
+.mini:active {
+  cursor: grabbing;
+}
+
+.pin {
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  background: #0a84ff;
+  color: #fff;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.pin svg {
   width: 10px;
   height: 10px;
-  border-radius: 50%;
-  background: var(--accent);
-  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.15);
 }
 
-.brand {
-  writing-mode: vertical-rl;
-  font-size: 13px;
-  font-weight: 650;
-  letter-spacing: 2px;
+.text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  text-align: left;
 }
 
-.status {
-  writing-mode: vertical-rl;
-  font-size: 11px;
-  color: var(--txt-2);
-  max-height: 120px;
+.line {
+  font-weight: 500;
+  color: #1d1d1f;
+  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.time {
-  font-size: 12px;
-  font-weight: 600;
+.sub {
+  font-size: 9px;
+  color: #98989d;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   font-variant-numeric: tabular-nums;
-  color: var(--accent);
 }
