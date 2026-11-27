@@ -365,7 +365,9 @@ fn ensure_secondary_window(
         .decorations(false)
         .maximizable(false)
         // 白底不透明窗：transparent 在 WebView2 冷启动会整窗空白（实证过），
-        // 所以底色固定不透明白，外形交给窗口区域裁（见 set_pin_clip）。
+        // 所以底色固定不透明白，外形交给窗口区域裁（见 set_pin_clip）；
+        // 系统投影也关掉，否则药丸/卡片外面会再套一层方形灰影。
+        .shadow(false)
         .background_color(Color(255, 255, 255, 255))
         .initialization_script(secondary_boot_script(label))
         .on_page_load(|window, payload| {
@@ -509,8 +511,38 @@ fn finish_pin_surface(window: &tauri::WebviewWindow, frame: &WindowFrame) {
             let _ = SetForegroundWindow(hwnd);
         }
     }
+    strip_window_frame(window);
     let _ = window.eval(pin_fallback_script());
 }
+
+/// 关掉系统给副窗画的非客户区渲染：DWM 会在窗口矩形外补一层投影，
+/// 药丸/圆角卡片外面那圈方形灰影和 1px 灰边就是它。
+#[cfg(windows)]
+fn strip_window_frame(window: &tauri::WebviewWindow) {
+    if let Ok(hwnd) = native_hwnd(window) {
+        // DWMWA_NCRENDERING_POLICY = 2，DWMNCRP_DISABLED = 1
+        let policy: i32 = 1;
+        // DWMWA_BORDER_COLOR = 34，DWMWA_COLOR_NONE = 0xFFFFFFFE
+        let border: u32 = 0xFFFF_FFFE;
+        unsafe {
+            DwmSetWindowAttribute(
+                hwnd,
+                2,
+                &policy as *const i32 as *const std::ffi::c_void,
+                std::mem::size_of::<i32>() as u32,
+            );
+            DwmSetWindowAttribute(
+                hwnd,
+                34,
+                &border as *const u32 as *const std::ffi::c_void,
+                std::mem::size_of::<u32>() as u32,
+            );
+        }
+    }
+}
+
+#[cfg(not(windows))]
+fn strip_window_frame(_window: &tauri::WebviewWindow) {}
 
 /// 用窗口区域把窗口外形裁成圆角：卡片给 14px，迷你条给高度一半（药丸）。
 /// 按真实外框裁，逻辑尺寸会差一个边框宽度，裁出来会有硬边。
@@ -695,6 +727,17 @@ unsafe extern "system" {
     ) -> *mut std::ffi::c_void;
     fn SetWindowRgn(hwnd: *mut std::ffi::c_void, rgn: *mut std::ffi::c_void, redraw: i32) -> i32;
     fn DeleteObject(object: *mut std::ffi::c_void) -> i32;
+}
+
+#[cfg(windows)]
+#[link(name = "dwmapi")]
+unsafe extern "system" {
+    fn DwmSetWindowAttribute(
+        hwnd: *mut std::ffi::c_void,
+        attribute: u32,
+        value: *const std::ffi::c_void,
+        size: u32,
+    ) -> i32;
 }
 
 fn apply_frame(window: &tauri::WebviewWindow, frame: &WindowFrame) -> Result<(), AppError> {

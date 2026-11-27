@@ -6,7 +6,6 @@
   flex-direction: column;
   overflow: hidden;
   border-radius: 14px;
-  border: 1px solid rgba(0, 0, 0, 0.07);
   background: #ffffff;
   color: var(--txt);
   font-family: "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;

@@ -25,7 +25,7 @@ function rowClass(status: PlanStatus): string {
 
 /** 置顶卡片：今日时刻表，按住标题栏可拖。 */
 export function PinWindow({ onCloseDemo }: Props) {
-  const { now, plans, activePlan } = useActiveNow();
+  const { plans, activePlan } = useActiveNow();
   const [mini, setMini] = useState(false);
   const shellRef = useRef<HTMLDivElement>(null);
   usePersistSecondaryOrigin("pin");
@@ -101,9 +101,10 @@ export function PinWindow({ onCloseDemo }: Props) {
     return <CapsuleWindow onOpenDemo={onCloseDemo} />;
   }
 
+  // 窄卡（210）里副标题只有一行，长文案会被截成省略号，所以只用最短说法。
   const subtitle = activePlan
-    ? `正在执行 · ${formatMinute(activePlan.start)}–${formatMinute(activePlan.end)}`
-    : `暂无进行中计划${now ? ` · ${formatMinute(now.minute)}` : ""}`;
+    ? `${formatMinute(activePlan.start)}–${formatMinute(activePlan.end)}`
+    : "暂无进行中";
 
   return (
     <div className={styles.shell} data-pin-bar="true" ref={shellRef}>

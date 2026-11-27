@@ -18,8 +18,8 @@ pub const PIN_MIN_WIDTH: f64 = 168.0; // 窄版卡片，192 宽是默认
 pub const PIN_MIN_HEIGHT: f64 = 150.0; // 卡片至少能放下头部 + 一条计划
 
 /// 旧版卡片默认尺寸，存档里等于它的按新默认迁一次（320 是最早的横条版，288/192 是上一版）。
-const PIN_LEGACY_WIDTHS: [f64; 4] = [320.0, 288.0, 192.0, 170.0];
-const PIN_WIDTH: f64 = 175.0;
+const PIN_LEGACY_WIDTHS: [f64; 5] = [320.0, 288.0, 192.0, 175.0, 170.0];
+const PIN_WIDTH: f64 = 210.0;
 const PIN_HEIGHT: f64 = 293.0;
 
 pub const CAPSULE_MIN_WIDTH: f64 = 150.0;
@@ -302,7 +302,7 @@ mod tests {
     #[test]
     fn default_pin_is_card_within_usable_range() {
         let pin = default_pin_frame();
-        assert!(pin.width >= 165.0 && pin.width <= 185.0);
+        assert!(pin.width >= 200.0 && pin.width <= 220.0);
         assert!(pin.height >= 260.0 && pin.height <= 400.0);
         validate_frame("pin", &pin, PIN_MIN_WIDTH, PIN_MIN_HEIGHT).expect("pin ok");
     }
