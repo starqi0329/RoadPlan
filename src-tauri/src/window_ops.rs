@@ -78,11 +78,13 @@ pub fn set_main_collapsed(
 }
 
 pub fn hide_main_to_tray(app: &AppHandle) -> Result<(), AppError> {
-    // 只隐藏，不写布局；已隐藏再调仍 Ok（可重复）。找不到主窗不假装成功。
+    // 只隐藏主窗，不写布局；已隐藏再调仍 Ok。找不到主窗不假装成功。
     let main = require_main(app)?;
     main.hide().map_err(|error| AppError::Internal {
         message: format!("隐藏主窗失败: {error}"),
     })?;
+    // 胶囊流程会先 show_capsule 再藏主窗：个别环境下藏主窗后副窗会丢置顶/可见性，这里按标志补一次。
+    reassert_visible_secondaries(app)?;
     Ok(())
 }
 
@@ -111,31 +113,65 @@ pub fn minimize_main(app: &AppHandle) -> Result<(), AppError> {
 }
 
 fn require_main(app: &AppHandle) -> Result<tauri::WebviewWindow, AppError> {
-    app.get_webview_window(MAIN_LABEL)
-        .ok_or_else(main_window_not_found)
+    require_labeled(app, MAIN_LABEL)
 }
 
-fn main_window_not_found() -> AppError {
+fn require_labeled(app: &AppHandle, label: &str) -> Result<tauri::WebviewWindow, AppError> {
+    app.get_webview_window(label)
+        .ok_or_else(|| window_not_found(label))
+}
+
+fn window_not_found(label: &str) -> AppError {
     AppError::NotFound {
         entity: "window".into(),
-        id: MAIN_LABEL.to_owned(),
+        id: label.to_owned(),
     }
+}
+
+fn reassert_visible_secondaries(app: &AppHandle) -> Result<(), AppError> {
+    let Some(state) = app.try_state::<WindowUiState>() else {
+        return Ok(());
+    };
+    let (pin_visible, capsule_visible) = {
+        let guard = lock_layout(&state)?;
+        (guard.pin_visible, guard.capsule_visible)
+    };
+    if pin_visible && let Some(win) = app.get_webview_window(PIN_LABEL) {
+        win.set_always_on_top(true)
+            .map_err(|error| AppError::Internal {
+                message: format!("恢复置顶失败: {error}"),
+            })?;
+        win.show().map_err(|error| AppError::Internal {
+            message: format!("恢复置顶显示失败: {error}"),
+        })?;
+    }
+    if capsule_visible && let Some(win) = app.get_webview_window(CAPSULE_LABEL) {
+        win.set_always_on_top(true)
+            .map_err(|error| AppError::Internal {
+                message: format!("恢复胶囊置顶失败: {error}"),
+            })?;
+        win.show().map_err(|error| AppError::Internal {
+            message: format!("恢复胶囊显示失败: {error}"),
+        })?;
+    }
+    Ok(())
 }
 
 pub fn show_pin(app: &AppHandle, state: &WindowUiState) -> Result<(), AppError> {
     ensure_secondary_window(app, state, PIN_LABEL)?;
-    if let Some(win) = app.get_webview_window(PIN_LABEL) {
-        win.set_always_on_top(true)
-            .map_err(|error| AppError::Internal {
-                message: format!("设置置顶失败: {error}"),
-            })?;
-        win.show().map_err(|error| AppError::Internal {
-            message: format!("显示置顶窗失败: {error}"),
+    let win = require_labeled(app, PIN_LABEL)?;
+    let layout = get_window_layout(state)?;
+    apply_frame(&win, &window_layout::resolve_pin_frame(layout.pin.as_ref()))?;
+    win.set_always_on_top(true)
+        .map_err(|error| AppError::Internal {
+            message: format!("设置置顶失败: {error}"),
         })?;
-        win.set_focus().map_err(|error| AppError::Internal {
-            message: format!("聚焦置顶窗失败: {error}"),
-        })?;
-    }
+    win.show().map_err(|error| AppError::Internal {
+        message: format!("显示置顶窗失败: {error}"),
+    })?;
+    win.set_focus().map_err(|error| AppError::Internal {
+        message: format!("聚焦置顶窗失败: {error}"),
+    })?;
     update_visibility(app, state, |layout| layout.pin_visible = true)
 }
 
@@ -150,15 +186,19 @@ pub fn hide_pin(app: &AppHandle, state: &WindowUiState) -> Result<(), AppError> 
 
 pub fn show_capsule(app: &AppHandle, state: &WindowUiState) -> Result<(), AppError> {
     ensure_secondary_window(app, state, CAPSULE_LABEL)?;
-    if let Some(win) = app.get_webview_window(CAPSULE_LABEL) {
-        win.set_always_on_top(true)
-            .map_err(|error| AppError::Internal {
-                message: format!("设置胶囊置顶失败: {error}"),
-            })?;
-        win.show().map_err(|error| AppError::Internal {
-            message: format!("显示胶囊失败: {error}"),
+    let win = require_labeled(app, CAPSULE_LABEL)?;
+    let layout = get_window_layout(state)?;
+    apply_frame(
+        &win,
+        &window_layout::resolve_capsule_frame(layout.capsule.as_ref()),
+    )?;
+    win.set_always_on_top(true)
+        .map_err(|error| AppError::Internal {
+            message: format!("设置胶囊置顶失败: {error}"),
         })?;
-    }
+    win.show().map_err(|error| AppError::Internal {
+        message: format!("显示胶囊失败: {error}"),
+    })?;
     update_visibility(app, state, |layout| layout.capsule_visible = true)
 }
 
@@ -242,22 +282,12 @@ fn ensure_secondary_window(
     let (title, frame, skip_taskbar) = match label {
         PIN_LABEL => (
             "时序 · 置顶",
-            layout.pin.unwrap_or(WindowFrame {
-                x: 80.0,
-                y: 120.0,
-                width: 320.0,
-                height: 480.0,
-            }),
+            window_layout::resolve_pin_frame(layout.pin.as_ref()),
             false,
         ),
         CAPSULE_LABEL => (
             "时序 · 胶囊",
-            layout.capsule.unwrap_or(WindowFrame {
-                x: 0.0,
-                y: 240.0,
-                width: 56.0,
-                height: 160.0,
-            }),
+            window_layout::resolve_capsule_frame(layout.capsule.as_ref()),
             true,
         ),
         other => {
@@ -267,8 +297,9 @@ fn ensure_secondary_window(
         }
     };
 
-    // 主窗 / 置顶 / 胶囊均为无系统边框（S5）；拖动由前端 startDragging。
-    let mut builder = WebviewWindowBuilder::new(app, label, WebviewUrl::App("index.html".into()))
+    // ?window= 让前端首屏就能认角色，避免先画整页主壳。
+    let url = WebviewUrl::App(format!("index.html?window={label}").into());
+    let mut builder = WebviewWindowBuilder::new(app, label, url)
         .title(title)
         .inner_size(frame.width, frame.height)
         .position(frame.x, frame.y)
@@ -283,6 +314,10 @@ fn ensure_secondary_window(
     builder.build().map_err(|error| AppError::Internal {
         message: format!("创建窗口 {label} 失败: {error}"),
     })?;
+
+    if app.get_webview_window(label).is_none() {
+        return Err(window_not_found(label));
+    }
     Ok(())
 }
 
@@ -306,11 +341,21 @@ mod tests {
 
     #[test]
     fn missing_main_is_not_found_not_ok() {
-        let err = main_window_not_found();
+        let err = window_not_found(MAIN_LABEL);
         assert!(matches!(
             err,
             AppError::NotFound { entity, id }
                 if entity == "window" && id == MAIN_LABEL
+        ));
+    }
+
+    #[test]
+    fn missing_secondary_is_not_found() {
+        let err = window_not_found(PIN_LABEL);
+        assert!(matches!(
+            err,
+            AppError::NotFound { entity, id }
+                if entity == "window" && id == PIN_LABEL
         ));
     }
 
