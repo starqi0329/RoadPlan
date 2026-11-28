@@ -456,7 +456,7 @@ pub fn minimize_main(app: AppHandle) -> Result<(), AppError> {
 
 #[tauri::command]
 #[specta::specta]
-pub fn show_pin(app: AppHandle, state: State<'_, WindowUiState>) -> Result<(), AppError> {
+pub async fn show_pin(app: AppHandle, state: State<'_, WindowUiState>) -> Result<(), AppError> {
     window_ops::show_pin(&app, &state)
 }
 
@@ -468,7 +468,7 @@ pub fn hide_pin(app: AppHandle, state: State<'_, WindowUiState>) -> Result<(), A
 
 #[tauri::command]
 #[specta::specta]
-pub fn show_capsule(app: AppHandle, state: State<'_, WindowUiState>) -> Result<(), AppError> {
+pub async fn show_capsule(app: AppHandle, state: State<'_, WindowUiState>) -> Result<(), AppError> {
     window_ops::show_capsule(&app, &state)
 }
 
