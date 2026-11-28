@@ -488,16 +488,46 @@ fn finish_pin_surface(window: &tauri::WebviewWindow, frame: &WindowFrame, corner
 }
 
 /// 用窗口区域把外轮廓裁成圆角/药丸，顺带去掉无边框窗口的直角边。
+/// 无边框窗口仍然带着 Windows 的可缩放边框时，客户区比窗口小一圈，
+/// 那一圈是系统自己画的灰边，网页铺不到。这里只按客户区裁：
+/// 外框整条被裁掉，圆角半径就能和 CSS 的 14px 严丝合缝对上。
 #[cfg(windows)]
-fn apply_rounded_region(hwnd: *mut std::ffi::c_void, width: i32, height: i32, radius: f64) {
+fn apply_rounded_region(_hwnd: *mut std::ffi::c_void, width: i32, height: i32, radius: f64) {
     let diameter = (radius * 2.0).round().max(1.0) as i32;
     unsafe {
-        let rgn = CreateRoundRectRgn(0, 0, width + 1, height + 1, diameter, diameter);
+        let mut client = Rect {
+            left: 0,
+            top: 0,
+            right: width,
+            bottom: height,
+        };
+        let mut window = Rect {
+            left: 0,
+            top: 0,
+            right: width,
+            bottom: height,
+        };
+        let mut origin = Point { x: 0, y: 0 };
+        let have_client =
+            GetClientRect(_hwnd, &mut client) != 0 && GetWindowRect(_hwnd, &mut window) != 0;
+        let have_origin = ClientToScreen(_hwnd, &mut origin) != 0;
+
+        let (left, top, right, bottom) = if have_client && have_origin {
+            let dx = origin.x - window.left;
+            let dy = origin.y - window.top;
+            let cw = (client.right - client.left).max(1);
+            let ch = (client.bottom - client.top).max(1);
+            (dx, dy, dx + cw, dy + ch)
+        } else {
+            (0, 0, width, height)
+        };
+
+        let rgn = CreateRoundRectRgn(left, top, right + 1, bottom + 1, diameter, diameter);
         if rgn.is_null() {
             return;
         }
         // 成功后区域归系统所有，不能再 DeleteObject；失败则自己回收。
-        if SetWindowRgn(hwnd, rgn, 1) == 0 {
+        if SetWindowRgn(_hwnd, rgn, 1) == 0 {
             let _ = DeleteObject(rgn);
         }
     }
@@ -635,9 +665,30 @@ const SWP_SHOWWINDOW: u32 = 0x0040;
 const HWND_TOPMOST: *mut std::ffi::c_void = -1isize as *mut std::ffi::c_void;
 
 #[cfg(windows)]
+#[repr(C)]
+#[derive(Clone, Copy)]
+struct Rect {
+    left: i32,
+    top: i32,
+    right: i32,
+    bottom: i32,
+}
+
+#[cfg(windows)]
+#[repr(C)]
+#[derive(Clone, Copy)]
+struct Point {
+    x: i32,
+    y: i32,
+}
+
+#[cfg(windows)]
 unsafe extern "system" {
     fn GetWindowLongW(hwnd: *mut std::ffi::c_void, index: i32) -> i32;
     fn SetWindowLongW(hwnd: *mut std::ffi::c_void, index: i32, new: i32) -> i32;
+    fn GetClientRect(hwnd: *mut std::ffi::c_void, rect: *mut Rect) -> i32;
+    fn GetWindowRect(hwnd: *mut std::ffi::c_void, rect: *mut Rect) -> i32;
+    fn ClientToScreen(hwnd: *mut std::ffi::c_void, point: *mut Point) -> i32;
     fn ShowWindow(hwnd: *mut std::ffi::c_void, cmd: i32) -> i32;
     fn IsIconic(hwnd: *mut std::ffi::c_void) -> i32;
     fn SetWindowPos(
